@@ -238,6 +238,29 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   .left-panel{display:none;}
   .bot-layout{grid-template-columns:1fr;}
   .cgrid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}
+
+  /* TOPBAR — stack brand + prices vertically, compact */
+  .topbar{padding:10px 14px;flex-wrap:wrap;gap:6px;}
+  .topbar-left{gap:8px;flex:1;min-width:0;}
+  .page-label{font-size:13px;}
+  .page-sublabel{font-size:10px;}
+  .topbar-right{gap:0;flex-shrink:0;}
+
+  /* Prices in a single horizontal row on mobile */
+  .stat-pill{flex-direction:row;align-items:center;gap:4px;padding:4px 8px;background:var(--surface2);border-radius:20px;border:1px solid var(--border);}
+  .stat-pill .sl{font-size:8px;color:var(--text3);letter-spacing:.04em;}
+  .stat-pill .sv{font-size:11px;font-weight:700;}
+  .stat-pill .sv span{font-size:9px;}
+
+  /* Hide % change label on mobile — too cramped */
+  .stat-pill .sv span:last-child{display:none;}
+
+  #clk{display:none;}
+  .live-dot{width:6px;height:6px;}
+
+  /* Pages */
+  .page{padding:16px 14px;}
+  .page-title{font-size:20px;}
 }
 
 /* ── COLLABS ── */
@@ -282,7 +305,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .cdm-inner h2{font-family:var(--font-d);font-size:20px;font-weight:800;margin-bottom:4px;}
 .timeline-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .pipe-add-btn{margin-top:auto;padding-top:8px;}
-@media(max-width:1100px){.pipeline{grid-template-columns:repeat(3,1fr);}.collab-form-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){
+  .topbar{padding:8px 10px;}
+  .page-label{font-size:12px;letter-spacing:0;}
+  .stat-pill{padding:3px 6px;}
+  .stat-pill .sl{font-size:7px;}
+  .stat-pill .sv{font-size:10px;}
+  .sidebar{width:52px;}
+  .nav-item{width:44px;}
+  .nav-item span{font-size:8px;}
+  .nav-icon{width:26px;height:26px;}
+  .page{padding:12px 10px;}
+}
 </style>
 </head>
 <body>
@@ -332,10 +366,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       </div>
     </div>
     <div class="topbar-right">
-      <div class="stat-pill"><span class="sl">BTC</span><span class="sv" id="btcP">$&mdash;</span></div>
-      <div class="stat-pill"><span class="sl">ETH</span><span class="sv" id="ethP">$&mdash;</span></div>
-      <div class="stat-pill"><span class="sl">SOL</span><span class="sv" id="solP">$&mdash;</span></div>
-      <div id="clk">--:--:--</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:nowrap;">
+        <div class="stat-pill"><span class="sl">BTC</span><span class="sv" id="btcP">$&mdash;</span></div>
+        <div class="stat-pill"><span class="sl">ETH</span><span class="sv" id="ethP">$&mdash;</span></div>
+        <div class="stat-pill"><span class="sl">SOL</span><span class="sv" id="solP">$&mdash;</span></div>
+      </div>
+      <div id="clk" style="margin-left:16px;">--:--:--</div>
     </div>
   </div>
 
