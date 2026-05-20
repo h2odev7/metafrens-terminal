@@ -331,9 +331,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     </div>
     <div class="topbar-right">
       <div class="stat-pill"><span class="sl">BTC</span><span class="sv" id="btcP">$&mdash;</span></div>
-      <div class="stat-pill"><span class="sl">Sats/vB</span><span class="sv" id="btcFee">&mdash;</span></div>
       <div class="stat-pill"><span class="sl">ETH</span><span class="sv" id="ethP">$&mdash;</span></div>
-      <div class="stat-pill"><span class="sl">Gwei</span><span class="sv" id="gasP">&mdash;</span></div>
+      <div class="stat-pill"><span class="sl">SOL</span><span class="sv" id="solP">$&mdash;</span></div>
       <div id="clk">--:--:--</div>
     </div>
   </div>
@@ -494,29 +493,36 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         <div style="margin-top:20px;">
           <div class="sec-hdr" style="margin-bottom:12px;">
             <span class="sec-title">&#9889; MINT DIRECT</span>
-            <span class="badge badge-purple">OpenSea &middot; Any ETH Drop</span>
+            <span class="badge badge-purple">ETH &middot; BTC &middot; SOL</span>
           </div>
           <div class="card" style="padding:18px 20px;">
             <div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6;">
-              Paste any OpenSea mint link — the bot fetches the contract, pre-fills the task form, and opens your wallet to sign in one click.
-            </div>
-            <div style="display:flex;gap:10px;margin-bottom:14px;">
-              <input type="text" id="mdUrl" class="form-input" style="flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:9px 12px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:13px;outline:none;" placeholder="https://opensea.io/collection/... or contract 0x..."/>
-              <button class="btn btn-primary" id="mdFetchBtn" style="white-space:nowrap;">&#128269; Fetch Contract</button>
+              Paste any mint link from OpenSea, Satflow, Ord.net, Magic Eden or Tensor &mdash; the bot resolves the contract, you configure and mint in one click.
             </div>
 
-            <!-- RESULT PANEL — hidden until fetched -->
+            <!-- CHAIN TABS -->
+            <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;">
+              <button class="md-chain-tab active" data-mdchain="ETH" style="padding:8px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:var(--font-b);font-size:12px;font-weight:600;cursor:pointer;margin-bottom:-1px;transition:all .15s;">&#926; Ethereum</button>
+              <button class="md-chain-tab" data-mdchain="BTC" style="padding:8px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:var(--font-b);font-size:12px;font-weight:600;cursor:pointer;margin-bottom:-1px;transition:all .15s;">&#8383; Ordinals</button>
+              <button class="md-chain-tab" data-mdchain="SOL" style="padding:8px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:var(--font-b);font-size:12px;font-weight:600;cursor:pointer;margin-bottom:-1px;transition:all .15s;">&#9675; Solana</button>
+            </div>
+
+            <!-- INPUT ROW -->
+            <div style="display:flex;gap:10px;margin-bottom:6px;">
+              <input type="text" id="mdUrl" style="flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:9px 12px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:13px;outline:none;transition:border .15s;" placeholder="https://opensea.io/collection/..."/>
+              <button class="btn btn-primary" id="mdFetchBtn" style="white-space:nowrap;">&#128269; Fetch</button>
+            </div>
+            <div id="mdHint" style="font-size:10.5px;color:var(--text3);margin-bottom:14px;">
+              Accepts: opensea.io &middot; 0x contract address
+            </div>
+
+            <!-- RESULT PANEL -->
             <div id="mdResult" style="display:none;">
-              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;" id="mdMeta"></div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;" id="mdMeta"></div>
 
               <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px;">
                 <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Mint Configuration</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
-                  <div class="lf" style="margin:0;"><label>Your ETH Address</label><input type="text" id="mdAddr" placeholder="0x&hellip;" style="width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;"/></div>
-                  <div class="lf" style="margin:0;"><label>Quantity</label><input type="number" id="mdQty" value="1" min="1" style="width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;"/></div>
-                  <div class="lf" style="margin:0;"><label>Max Gas (gwei)</label><input type="number" id="mdGas" value="50" style="width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;"/></div>
-                  <div class="lf" style="margin:0;"><label>Priority Tip</label><input type="number" id="mdTip" value="2" step="0.1" style="width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;"/></div>
-                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;" id="mdConfigFields"></div>
               </div>
 
               <div style="display:flex;gap:10px;">
@@ -525,8 +531,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
               </div>
             </div>
 
-            <!-- STATUS LINE -->
-            <div id="mdStatus" style="font-size:11px;color:var(--text3);margin-top:8px;display:none;"></div>
+            <div id="mdStatus" style="font-size:11px;margin-top:8px;display:none;"></div>
           </div>
         </div>
 
@@ -654,16 +659,22 @@ function setApi(k,s,lbl){
 /* BTC PRICE + FEES (mempool.space) */
 async function loadBtc(){
   try{
-    const [pr,fr]=await Promise.all([
-      fetch(CORS('https://api.coinbase.com/v2/prices/BTC-USD/spot')),
-      fetch(CORS('https://mempool.space/api/v1/fees/recommended'))
-    ]);
-    const pd=await pr.json(); const fd=await fr.json();
-    STATE.btcPrice=parseFloat(pd.data.amount);
+    const r=await fetch(CORS('https://api.coinbase.com/v2/prices/BTC-USD/spot'));
+    const d=await r.json();
+    STATE.btcPrice=parseFloat(d.data.amount);
     $('btcP').textContent='$'+STATE.btcPrice.toLocaleString('en-US',{maximumFractionDigits:0});
-    $('btcFee').textContent=fd.fastestFee+'s/vB';
-    log('BTC $'+STATE.btcPrice.toLocaleString()+' · '+fd.fastestFee+' sats/vB','ok');
-  }catch(e){$('btcP').textContent='$—';$('btcFee').textContent='—';}
+    log('BTC $'+STATE.btcPrice.toLocaleString(),'ok');
+  }catch(e){$('btcP').textContent='$—';}
+}
+
+async function loadSol(){
+  try{
+    const r=await fetch(CORS('https://api.coinbase.com/v2/prices/SOL-USD/spot'));
+    const d=await r.json();
+    const price=parseFloat(d.data.amount);
+    $('solP').textContent='$'+price.toLocaleString('en-US',{maximumFractionDigits:2});
+    log('SOL $'+price.toFixed(2),'ok');
+  }catch(e){if($('solP'))$('solP').textContent='$—';}
 }
 
 /* ORDINALS — Hiro API · Marketplaces: Satflow + Ord.net */
@@ -1151,165 +1162,335 @@ function log(msg,type=''){
 }
 
 async function init(){
-  updateClock();setInterval(updateClock,1000);setInterval(tick,1000);setInterval(loadEth,60e3);setInterval(loadGas,30e3);setInterval(loadBtc,60e3);
+  updateClock();setInterval(updateClock,1000);setInterval(tick,1000);setInterval(loadEth,60e3);setInterval(loadGas,30e3);setInterval(loadBtc,60e3);setInterval(loadSol,60e3);
   setInterval(()=>{fetchOs();fetchCg();fetchOrdinals();},5*60e3);
   const t=new Date();t.setHours(t.getHours()+1);$('mTime').value=t.toISOString().slice(0,16);
   renderTracked();renderTasks();renderSaved();
   log('Connecting to live data sources...','info');
-  await Promise.all([loadEth(),loadGas(),loadBtc(),getOsKey().then(()=>fetchOs()),fetchCg(),fetchOrdinals()]);
+  await Promise.all([loadEth(),loadGas(),loadBtc(),loadSol(),getOsKey().then(()=>fetchOs()),fetchCg(),fetchOrdinals()]);
   setTimeout(()=>loadTwEmbeds(),600);
 }
 /* ═══════════════════════════════════════
-   MINT DIRECT — paste OpenSea link, mint
+   MINT DIRECT — multi-chain paste & mint
+   ETH: OpenSea API → contract → MetaMask
+   BTC: Satflow/Ord.net → inscription → UniSat/Xverse
+   SOL: Magic Eden/Tensor → program → Phantom/Backpack
 ═══════════════════════════════════════ */
-const MD = { contract:null, price:0, fn:'mint(uint256)', name:'', slug:'' };
+const MD = { chain:'ETH', contract:null, price:0, fn:'mint(uint256)', name:'', slug:'' };
+
+// Chain tab active styles
+const MD_COLORS = { ETH:'#4f8ef7', BTC:'#f97316', SOL:'#9945ff' };
+document.querySelectorAll('.md-chain-tab').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.md-chain-tab').forEach(x => {
+      x.style.borderBottomColor = 'transparent';
+      x.style.color = 'var(--text3)';
+    });
+    b.style.borderBottomColor = MD_COLORS[b.dataset.mdchain];
+    b.style.color = MD_COLORS[b.dataset.mdchain];
+    MD.chain = b.dataset.mdchain;
+    $('mdResult').style.display = 'none';
+    $('mdStatus').style.display = 'none';
+
+    const hints = {
+      ETH: 'Accepts: opensea.io/collection/slug &middot; 0x contract address',
+      BTC: 'Accepts: satflow.com/collection/slug &middot; ord.net/collection/slug &middot; inscription ID',
+      SOL: 'Accepts: magiceden.io/marketplace/slug &middot; tensor.trade/trade/slug &middot; Candy Machine address'
+    };
+    const placeholders = {
+      ETH: 'https://opensea.io/collection/... or 0x contract',
+      BTC: 'https://satflow.com/collection/... or ord.net/collection/...',
+      SOL: 'https://magiceden.io/marketplace/... or Candy Machine address'
+    };
+    $('mdHint').innerHTML = hints[MD.chain];
+    $('mdUrl').placeholder = placeholders[MD.chain];
+  });
+});
+// Set initial active style
+document.querySelector('.md-chain-tab[data-mdchain="ETH"]').style.borderBottomColor = '#4f8ef7';
+document.querySelector('.md-chain-tab[data-mdchain="ETH"]').style.color = '#4f8ef7';
 
 function mdStatus(msg, type=''){
-  const el=$('mdStatus');
-  el.style.display='block';
+  const el = $('mdStatus');
+  el.style.display = 'block';
   el.style.color = type==='ok'?'var(--green)':type==='err'?'var(--red)':'var(--text3)';
   el.textContent = msg;
 }
 
-function mdMetaCard(label, val, color=''){
+function mdCard(label, val, color=''){
   return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;">
     <div style="font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">${label}</div>
-    <div style="font-size:13px;font-weight:700;color:${color||'var(--text)'};">${val}</div>
+    <div style="font-size:12.5px;font-weight:700;color:${color||'var(--text)'};">${val}</div>
   </div>`;
 }
 
-// Extract slug or contract from any OpenSea URL or raw address
-function parseOsInput(raw){
-  raw = raw.trim();
-  // raw contract address
-  if(raw.match(/^0x[a-fA-F0-9]{40}$/)) return { type:'contract', value:raw };
-  // opensea.io/collection/slug or opensea.io/assets/ethereum/0x.../tokenid
-  const slugMatch = raw.match(/opensea\.io\/collection\/([^/?#]+)/);
-  if(slugMatch) return { type:'slug', value:slugMatch[1] };
-  const contractMatch = raw.match(/opensea\.io\/assets\/ethereum\/(0x[a-fA-F0-9]{40})/);
-  if(contractMatch) return { type:'contract', value:contractMatch[1] };
-  // just a slug-like string
-  if(raw.length > 2 && !raw.includes(' ')) return { type:'slug', value:raw };
+function inputField(id, label, placeholder, type='text', extra=''){
+  return `<div style="margin:0;"><div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">${label}</div>
+    <input type="${type}" id="${id}" placeholder="${placeholder}" ${extra}
+      style="width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;"/></div>`;
+}
+
+/* ── URL PARSERS ── */
+function parseEthInput(raw){
+  if(raw.match(/^0x[a-fA-F0-9]{40}$/)) return {type:'contract',value:raw};
+  const slug = raw.match(/opensea\.io\/collection\/([^/?#]+)/);
+  if(slug) return {type:'slug',value:slug[1]};
+  const contract = raw.match(/opensea\.io\/assets\/ethereum\/(0x[a-fA-F0-9]{40})/);
+  if(contract) return {type:'contract',value:contract[1]};
+  if(raw.length>2 && !raw.includes(' ')) return {type:'slug',value:raw};
   return null;
 }
 
-$('mdFetchBtn').addEventListener('click', async () => {
-  const raw = $('mdUrl').value.trim();
-  if(!raw){ mdStatus('Paste an OpenSea link or contract address first.','err'); return; }
+function parseBtcInput(raw){
+  // satflow.com/collection/slug
+  const sf = raw.match(/satflow\.com\/collection\/([^/?#]+)/);
+  if(sf) return {type:'slug',value:sf[1],platform:'satflow'};
+  // ord.net/collection/slug
+  const on = raw.match(/ord\.net\/collection\/([^/?#]+)/);
+  if(on) return {type:'slug',value:on[1],platform:'ordnet'};
+  // raw inscription/collection ID
+  if(raw.length > 5 && !raw.includes('/')) return {type:'slug',value:raw,platform:'hiro'};
+  return null;
+}
 
-  const parsed = parseOsInput(raw);
-  if(!parsed){ mdStatus('Could not parse that URL. Try pasting the OpenSea collection link directly.','err'); return; }
+function parseSolInput(raw){
+  // magiceden.io/marketplace/slug OR magiceden.io/launchpad/slug
+  const me = raw.match(/magiceden\.io\/(?:marketplace|launchpad|collections)\/([^/?#]+)/);
+  if(me) return {type:'slug',value:me[1],platform:'magiceden'};
+  // tensor.trade/trade/slug
+  const tt = raw.match(/tensor\.trade\/trade\/([^/?#]+)/);
+  if(tt) return {type:'slug',value:tt[1],platform:'tensor'};
+  // base58 candy machine / program address
+  if(raw.match(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/)) return {type:'address',value:raw,platform:'direct'};
+  return null;
+}
 
-  mdStatus('Fetching contract details from OpenSea\u2026');
-  $('mdResult').style.display='none';
+/* ── FETCH HANDLERS ── */
+async function fetchEthContract(parsed){
+  const key = STATE.osKey || await getOsKey();
+  const h = {'Accept':'application/json','x-api-key':key};
+  let colData = null;
+
+  if(parsed.type==='slug'){
+    const r = await fetch(CORS(`https://api.opensea.io/api/v2/collections/${parsed.value}`),{headers:h});
+    colData = await r.json();
+  } else {
+    const r = await fetch(CORS(`https://api.opensea.io/api/v2/chain/ethereum/contract/${parsed.value}`),{headers:h});
+    const d = await r.json();
+    if(d.collection){
+      const r2 = await fetch(CORS(`https://api.opensea.io/api/v2/collections/${d.collection}`),{headers:h});
+      colData = await r2.json();
+    }
+  }
+  if(!colData||colData.errors) throw new Error('Collection not found on OpenSea.');
+
+  const contract = colData.contracts?.[0]?.address || parsed.value;
+  if(!contract?.match(/^0x[a-fA-F0-9]{40}$/)) throw new Error('Could not resolve contract address.');
+
+  let floor = 0;
+  try{
+    const sr = await fetch(CORS(`https://api.opensea.io/api/v2/collections/${colData.collection}/stats`),{headers:h});
+    const sd = await sr.json();
+    floor = sd.total?.floor_price||0;
+  }catch(e){}
+
+  MD.contract = contract;
+  MD.price = floor;
+  MD.name = colData.name||colData.collection;
+  MD.slug = colData.collection;
+  MD.fn = 'mint(uint256)';
+
+  $('mdMeta').innerHTML =
+    mdCard('Collection', MD.name) +
+    mdCard('Contract', contract.slice(0,10)+'\u2026'+contract.slice(-4)) +
+    mdCard('Floor', floor>0?floor.toFixed(4)+' \u039E':'FREE', floor>0?'var(--green)':'var(--text2)') +
+    mdCard('Supply', colData.total_supply?parseInt(colData.total_supply).toLocaleString():'—') +
+    mdCard('Status', colData.safelist_status==='verified'?'\u2713 Verified':'Unverified', colData.safelist_status==='verified'?'var(--green)':'var(--text2)') +
+    mdCard('Source', 'OpenSea');
+
+  $('mdConfigFields').innerHTML =
+    inputField('mdAddr','Your ETH Address','0x\u2026') +
+    inputField('mdQty','Quantity','1','number','value="1" min="1"') +
+    inputField('mdGas','Max Gas (gwei)','50','number','value="50"') +
+    inputField('mdTip','Priority Tip','2','number','value="2" step="0.1"');
+}
+
+async function fetchBtcContract(parsed){
+  // Fetch from Hiro API
+  let colName = parsed.value;
+  let floor = null;
+  let supply = null;
+  let image = null;
 
   try{
-    const key = STATE.osKey || await getOsKey();
-    const h = {'Accept':'application/json','x-api-key':key};
-    let colData = null;
-
-    if(parsed.type === 'slug'){
-      const r = await fetch(CORS(`https://api.opensea.io/api/v2/collections/${parsed.value}`), {headers:h});
-      colData = await r.json();
-    } else {
-      // contract address — find the collection slug first
-      const r = await fetch(CORS(`https://api.opensea.io/api/v2/chain/ethereum/contract/${parsed.value}`), {headers:h});
-      const d = await r.json();
-      if(d.collection){
-        const r2 = await fetch(CORS(`https://api.opensea.io/api/v2/collections/${d.collection}`), {headers:h});
-        colData = await r2.json();
-      }
+    const r = await fetch(CORS(`https://api.hiro.so/ordinals/v1/collections?name=${encodeURIComponent(parsed.value)}`));
+    const d = await r.json();
+    const col = d.results?.[0]||{};
+    if(col.collection_id){
+      colName = col.name || parsed.value;
+      floor = col.floor_price ? col.floor_price/1e8 : null;
+      supply = col.total_supply;
+      image = col.collection_image;
     }
+  }catch(e){}
 
-    if(!colData || colData.errors){ throw new Error('Collection not found on OpenSea.'); }
+  MD.contract = parsed.value; // slug used as identifier
+  MD.price = floor||0;
+  MD.name = colName;
+  MD.slug = parsed.value;
+  MD.chain = 'BTC';
 
-    // Get contract address
-    const contract = colData.contracts?.[0]?.address || parsed.value;
-    if(!contract || !contract.match(/^0x[a-fA-F0-9]{40}$/)){ throw new Error('Could not resolve contract address.'); }
+  const floorStr = floor!=null && floor>0 ? Math.round(floor*1e8).toLocaleString()+' sats' : '—';
+  const sfUrl = `https://www.satflow.com/collection/${encodeURIComponent(parsed.value)}`;
+  const onUrl = `https://ord.net/collection/${encodeURIComponent(parsed.value)}`;
 
-    // Get stats for floor price
-    let floor = 0;
+  $('mdMeta').innerHTML =
+    mdCard('Collection', colName) +
+    mdCard('Slug / ID', parsed.value.slice(0,20)+(parsed.value.length>20?'\u2026':'')) +
+    mdCard('Floor', floorStr, floor>0?'var(--btc)':'var(--text2)') +
+    mdCard('Supply', supply?parseInt(supply).toLocaleString():'—') +
+    mdCard('Platform', parsed.platform==='satflow'?'Satflow':parsed.platform==='ordnet'?'Ord.net':'Hiro') +
+    `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;">
+      <div style="font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Marketplaces</div>
+      <div style="display:flex;gap:5px;">
+        <a href="${sfUrl}" target="_blank" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;font-size:9px;padding:4px;color:var(--btc);border-color:rgba(249,115,22,.3);">Satflow &#8599;</a>
+        <a href="${onUrl}" target="_blank" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;font-size:9px;padding:4px;color:var(--btc);border-color:rgba(249,115,22,.3);">Ord.net &#8599;</a>
+      </div>
+    </div>`;
+
+  $('mdConfigFields').innerHTML =
+    inputField('mdAddr','Your Bitcoin Address (Taproot)','bc1p\u2026') +
+    inputField('mdQty','Quantity','1','number','value="1" min="1"') +
+    inputField('mdSats','Max Fee (sats/vB)','20','number','value="20" min="1"') +
+    `<div style="margin:0;"><div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Network Fee</div>
+      <div style="font-size:12px;color:var(--btc);font-weight:700;padding:8px 0;"><span id="mdLiveFee">${STATE.gasPrice>0?Math.round(STATE.gasPrice)+' sats/vB':'loading…'}</span></div></div>`;
+}
+
+async function fetchSolContract(parsed){
+  let colName = parsed.value;
+  let floor = null;
+  let supply = null;
+
+  if(parsed.platform==='magiceden'){
     try{
-      const sr = await fetch(CORS(`https://api.opensea.io/api/v2/collections/${colData.collection}/stats`), {headers:h});
-      const sd = await sr.json();
-      floor = sd.total?.floor_price || 0;
+      const r = await fetch(CORS(`https://api-mainnet.magiceden.dev/v2/collections/${parsed.value}`));
+      const d = await r.json();
+      if(d.name){
+        colName = d.name;
+        floor = d.floorPrice ? d.floorPrice/1e9 : null; // lamports to SOL
+        supply = d.totalItems;
+      }
     }catch(e){}
+  }
 
-    // Store for mint
-    MD.contract = contract;
-    MD.price = floor;
-    MD.name = colData.name || colData.collection;
-    MD.slug = colData.collection;
-    MD.fn = 'mint(uint256)';
+  MD.contract = parsed.value;
+  MD.price = floor||0;
+  MD.name = colName;
+  MD.slug = parsed.value;
+  MD.chain = 'SOL';
 
-    // Render meta cards
-    const supplyStr = colData.total_supply ? parseInt(colData.total_supply).toLocaleString() : '—';
-    const floorStr = floor > 0 ? floor.toFixed(4)+' \u039E' : 'FREE';
-    const safeStr = colData.safelist_status === 'verified' ? '\u2713 Verified' : colData.safelist_status || '—';
+  const floorStr = floor!=null && floor>0 ? floor.toFixed(3)+' SOL' : '—';
+  const meUrl = `https://magiceden.io/marketplace/${parsed.value}`;
+  const ttUrl = `https://www.tensor.trade/trade/${parsed.value}`;
 
-    $('mdMeta').innerHTML =
-      mdMetaCard('Collection', MD.name) +
-      mdMetaCard('Contract', contract.slice(0,10)+'\u2026'+contract.slice(-4)) +
-      mdMetaCard('Floor Price', floorStr, floor>0?'var(--green)':'var(--text2)') +
-      mdMetaCard('Supply', supplyStr) +
-      mdMetaCard('Status', safeStr, colData.safelist_status==='verified'?'var(--green)':'var(--text2)') +
-      mdMetaCard('Category', colData.category || 'NFT');
+  $('mdMeta').innerHTML =
+    mdCard('Collection', colName) +
+    mdCard('Address / Slug', parsed.value.slice(0,16)+'\u2026') +
+    mdCard('Floor', floorStr, floor>0?'#9945ff':'var(--text2)') +
+    mdCard('Supply', supply?parseInt(supply).toLocaleString():'—') +
+    mdCard('Platform', parsed.platform==='magiceden'?'Magic Eden':parsed.platform==='tensor'?'Tensor':'Direct') +
+    `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;">
+      <div style="font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Marketplaces</div>
+      <div style="display:flex;gap:5px;">
+        <a href="${meUrl}" target="_blank" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;font-size:9px;padding:4px;color:#9945ff;border-color:rgba(153,69,255,.3);">ME &#8599;</a>
+        <a href="${ttUrl}" target="_blank" class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;font-size:9px;padding:4px;color:#9945ff;border-color:rgba(153,69,255,.3);">Tensor &#8599;</a>
+      </div>
+    </div>`;
 
-    // Pre-fill price
-    $('mdQty').value = 1;
+  $('mdConfigFields').innerHTML =
+    inputField('mdAddr','Your Solana Address','Wallet address (base58)') +
+    inputField('mdQty','Quantity','1','number','value="1" min="1"') +
+    inputField('mdMicro','Priority Fee (\u03BCSOL)','100000','number','value="100000" step="50000"') +
+    `<div style="margin:0;"><div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Wallet</div>
+      <div style="font-size:11px;color:var(--text2);padding:8px 0;">Phantom or Backpack</div></div>`;
+}
 
+/* ── FETCH BUTTON ── */
+$('mdFetchBtn').addEventListener('click', async () => {
+  const raw = $('mdUrl').value.trim();
+  if(!raw){ mdStatus('Paste a mint link first.','err'); return; }
+
+  $('mdResult').style.display='none';
+  mdStatus('Fetching\u2026');
+
+  try{
+    if(MD.chain==='ETH'){
+      const parsed = parseEthInput(raw);
+      if(!parsed){ mdStatus('Could not parse ETH link. Try the OpenSea collection URL or 0x address.','err'); return; }
+      await fetchEthContract(parsed);
+    } else if(MD.chain==='BTC'){
+      const parsed = parseBtcInput(raw);
+      if(!parsed){ mdStatus('Could not parse BTC link. Try a Satflow or Ord.net collection URL.','err'); return; }
+      await fetchBtcContract(parsed);
+    } else if(MD.chain==='SOL'){
+      const parsed = parseSolInput(raw);
+      if(!parsed){ mdStatus('Could not parse SOL link. Try a Magic Eden or Tensor URL.','err'); return; }
+      await fetchSolContract(parsed);
+    }
     $('mdResult').style.display = 'block';
-    mdStatus('\u2713 Contract resolved \u2014 configure and mint below.', 'ok');
-    log('Mint Direct: loaded '+MD.name+' ('+contract.slice(0,10)+'\u2026)', 'ok');
-
+    mdStatus('\u2713 Loaded \u2014 configure below and mint.','ok');
+    log('Mint Direct ['+MD.chain+']: loaded '+MD.name,'ok');
   }catch(e){
-    mdStatus('Error: '+e.message, 'err');
-    log('Mint Direct error: '+e.message, 'err');
+    mdStatus('Error: '+e.message,'err');
+    log('Mint Direct error: '+e.message,'err');
   }
 });
 
+/* ── MINT NOW ── */
 $('mdMintNow').addEventListener('click', ()=>{
-  const addr = $('mdAddr').value.trim();
-  if(!addr.match(/^0x[a-fA-F0-9]{40}$/)){ mdStatus('Enter your ETH wallet address first.','err'); return; }
-  if(!MD.contract){ mdStatus('Fetch a contract first.','err'); return; }
+  const addr = ($('mdAddr')||{}).value?.trim();
+  if(!addr){ mdStatus('Enter your wallet address first.','err'); return; }
+  if(!MD.contract){ mdStatus('Fetch a collection first.','err'); return; }
 
-  const qty = parseInt($('mdQty').value)||1;
-  const price = MD.price;
-  const maxGas = parseInt($('mdGas').value)||50;
-  const tip = parseFloat($('mdTip').value)||2;
-
-  // Build and open modal directly
+  const qty = parseInt(($('mdQty')||{}).value)||1;
   const task = {
-    id: Date.now(), chain:'ETH', addr, contract:MD.contract,
-    fn: MD.fn, qty, price, mode:'manual',
-    maxGas, tip, status:'ready', time:null
+    id:Date.now(), chain:MD.chain, addr, contract:MD.contract,
+    fn:MD.fn||'mint(uint256)', qty, price:MD.price, mode:'manual',
+    maxGas:parseInt(($('mdGas')||{}).value)||50,
+    tip:parseFloat(($('mdTip')||{}).value)||2,
+    maxSats:parseInt(($('mdSats')||{}).value)||20,
+    microLamports:parseInt(($('mdMicro')||{}).value)||100000,
+    status:'ready', time:null
   };
   openModal(task);
-  log('Mint Direct: firing \u26A1 '+MD.name+' \xd7'+qty+' @ '+price+'\u039E', 'ok');
+  log('Mint Direct \u26A1 ['+MD.chain+'] '+MD.name+' \xd7'+qty,'ok');
 });
 
+/* ── ADD TO QUEUE ── */
 $('mdAddTask').addEventListener('click', ()=>{
-  const addr = $('mdAddr').value.trim();
-  if(!addr.match(/^0x[a-fA-F0-9]{40}$/)){ mdStatus('Enter your ETH wallet address first.','err'); return; }
-  if(!MD.contract){ mdStatus('Fetch a contract first.','err'); return; }
+  const addr = ($('mdAddr')||{}).value?.trim();
+  if(!addr){ mdStatus('Enter your wallet address first.','err'); return; }
+  if(!MD.contract){ mdStatus('Fetch a collection first.','err'); return; }
 
-  // Switch chain selector to ETH and pre-fill the task form
+  // Switch main chain selector to match
   document.querySelectorAll('#chainBar .mode-opt').forEach(b=>{
-    b.classList.toggle('active', b.dataset.chain==='ETH');
+    b.classList.toggle('active', b.dataset.chain===MD.chain);
   });
-  STATE.chain='ETH';
-  $('uAddr').value = addr;
-  $('cAddr').value = MD.contract;
-  $('mFn').value   = MD.fn;
-  $('mPrc').value  = MD.price;
-  $('mGas').value  = $('mdGas').value;
-  $('mTip').value  = $('mdTip').value;
+  STATE.chain = MD.chain;
 
-  // Scroll task form into view
-  $('uAddr').scrollIntoView({behavior:'smooth', block:'center'});
+  $('uAddr').value  = addr;
+  $('cAddr').value  = MD.contract;
+  if($('mFn')) $('mFn').value = MD.fn||'mint(uint256)';
+  $('mPrc').value   = MD.price||0;
+  if($('mGas')&&$('mdGas')) $('mGas').value = $('mdGas').value;
+  if($('mTip')&&$('mdTip')) $('mTip').value = $('mdTip').value;
+  if($('mSats')&&$('mdSats')) $('mSats').value = $('mdSats').value;
+  if($('mMicro')&&$('mdMicro')) $('mMicro').value = $('mdMicro').value;
+
+  $('uAddr').scrollIntoView({behavior:'smooth',block:'center'});
   $('uAddr').focus();
-  mdStatus('\u2713 Pre-filled in the task form above \u2014 set mode and add.','ok');
-  log('Mint Direct: pre-filled task form for '+MD.name,'info');
+  mdStatus('\u2713 Pre-filled in task form \u2014 set mode and add.','ok');
+  log('Mint Direct: pre-filled ['+MD.chain+'] task for '+MD.name,'info');
 });
 
 const COLLAB_STAGES = [
