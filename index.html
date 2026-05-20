@@ -489,6 +489,47 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
             <div id="actTasks"></div>
           </div>
         </div>
+
+        <!-- MINT DIRECT -->
+        <div style="margin-top:20px;">
+          <div class="sec-hdr" style="margin-bottom:12px;">
+            <span class="sec-title">&#9889; MINT DIRECT</span>
+            <span class="badge badge-purple">OpenSea &middot; Any ETH Drop</span>
+          </div>
+          <div class="card" style="padding:18px 20px;">
+            <div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6;">
+              Paste any OpenSea mint link — the bot fetches the contract, pre-fills the task form, and opens your wallet to sign in one click.
+            </div>
+            <div style="display:flex;gap:10px;margin-bottom:14px;">
+              <input type="text" id="mdUrl" class="form-input" style="flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:9px 12px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:13px;outline:none;" placeholder="https://opensea.io/collection/... or contract 0x..."/>
+              <button class="btn btn-primary" id="mdFetchBtn" style="white-space:nowrap;">&#128269; Fetch Contract</button>
+            </div>
+
+            <!-- RESULT PANEL — hidden until fetched -->
+            <div id="mdResult" style="display:none;">
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;" id="mdMeta"></div>
+
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px;">
+                <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Mint Configuration</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
+                  <div class="lf" style="margin:0;"><label>Your ETH Address</label><input type="text" id="mdAddr" placeholder="0x&hellip;" style="width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;"/></div>
+                  <div class="lf" style="margin:0;"><label>Quantity</label><input type="number" id="mdQty" value="1" min="1" style="width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;"/></div>
+                  <div class="lf" style="margin:0;"><label>Max Gas (gwei)</label><input type="number" id="mdGas" value="50" style="width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;"/></div>
+                  <div class="lf" style="margin:0;"><label>Priority Tip</label><input type="number" id="mdTip" value="2" step="0.1" style="width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;"/></div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:10px;">
+                <button class="btn btn-primary" id="mdMintNow" style="flex:1;justify-content:center;padding:11px;">&#9889; Mint Now &mdash; Open Wallet</button>
+                <button class="btn btn-secondary" id="mdAddTask" style="flex:1;justify-content:center;padding:11px;">+ Add to Task Queue</button>
+              </div>
+            </div>
+
+            <!-- STATUS LINE -->
+            <div id="mdStatus" style="font-size:11px;color:var(--text3);margin-top:8px;display:none;"></div>
+          </div>
+        </div>
+
         <div class="blog" id="botLog"><div class="ll info"><span class="ts">[boot]</span>METAFRENS Terminal &mdash; Live APIs connected. Address-only signing. No keys. Ever.</div></div>
       </div>
 
@@ -1118,9 +1159,158 @@ async function init(){
   await Promise.all([loadEth(),loadGas(),loadBtc(),getOsKey().then(()=>fetchOs()),fetchCg(),fetchOrdinals()]);
   setTimeout(()=>loadTwEmbeds(),600);
 }
-/* ═══════════════════════════════════════════
-   COLLAB HUB — full pipeline management
-═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   MINT DIRECT — paste OpenSea link, mint
+═══════════════════════════════════════ */
+const MD = { contract:null, price:0, fn:'mint(uint256)', name:'', slug:'' };
+
+function mdStatus(msg, type=''){
+  const el=$('mdStatus');
+  el.style.display='block';
+  el.style.color = type==='ok'?'var(--green)':type==='err'?'var(--red)':'var(--text3)';
+  el.textContent = msg;
+}
+
+function mdMetaCard(label, val, color=''){
+  return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;">
+    <div style="font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">${label}</div>
+    <div style="font-size:13px;font-weight:700;color:${color||'var(--text)'};">${val}</div>
+  </div>`;
+}
+
+// Extract slug or contract from any OpenSea URL or raw address
+function parseOsInput(raw){
+  raw = raw.trim();
+  // raw contract address
+  if(raw.match(/^0x[a-fA-F0-9]{40}$/)) return { type:'contract', value:raw };
+  // opensea.io/collection/slug or opensea.io/assets/ethereum/0x.../tokenid
+  const slugMatch = raw.match(/opensea\.io\/collection\/([^/?#]+)/);
+  if(slugMatch) return { type:'slug', value:slugMatch[1] };
+  const contractMatch = raw.match(/opensea\.io\/assets\/ethereum\/(0x[a-fA-F0-9]{40})/);
+  if(contractMatch) return { type:'contract', value:contractMatch[1] };
+  // just a slug-like string
+  if(raw.length > 2 && !raw.includes(' ')) return { type:'slug', value:raw };
+  return null;
+}
+
+$('mdFetchBtn').addEventListener('click', async () => {
+  const raw = $('mdUrl').value.trim();
+  if(!raw){ mdStatus('Paste an OpenSea link or contract address first.','err'); return; }
+
+  const parsed = parseOsInput(raw);
+  if(!parsed){ mdStatus('Could not parse that URL. Try pasting the OpenSea collection link directly.','err'); return; }
+
+  mdStatus('Fetching contract details from OpenSea\u2026');
+  $('mdResult').style.display='none';
+
+  try{
+    const key = STATE.osKey || await getOsKey();
+    const h = {'Accept':'application/json','x-api-key':key};
+    let colData = null;
+
+    if(parsed.type === 'slug'){
+      const r = await fetch(CORS(`https://api.opensea.io/api/v2/collections/${parsed.value}`), {headers:h});
+      colData = await r.json();
+    } else {
+      // contract address — find the collection slug first
+      const r = await fetch(CORS(`https://api.opensea.io/api/v2/chain/ethereum/contract/${parsed.value}`), {headers:h});
+      const d = await r.json();
+      if(d.collection){
+        const r2 = await fetch(CORS(`https://api.opensea.io/api/v2/collections/${d.collection}`), {headers:h});
+        colData = await r2.json();
+      }
+    }
+
+    if(!colData || colData.errors){ throw new Error('Collection not found on OpenSea.'); }
+
+    // Get contract address
+    const contract = colData.contracts?.[0]?.address || parsed.value;
+    if(!contract || !contract.match(/^0x[a-fA-F0-9]{40}$/)){ throw new Error('Could not resolve contract address.'); }
+
+    // Get stats for floor price
+    let floor = 0;
+    try{
+      const sr = await fetch(CORS(`https://api.opensea.io/api/v2/collections/${colData.collection}/stats`), {headers:h});
+      const sd = await sr.json();
+      floor = sd.total?.floor_price || 0;
+    }catch(e){}
+
+    // Store for mint
+    MD.contract = contract;
+    MD.price = floor;
+    MD.name = colData.name || colData.collection;
+    MD.slug = colData.collection;
+    MD.fn = 'mint(uint256)';
+
+    // Render meta cards
+    const supplyStr = colData.total_supply ? parseInt(colData.total_supply).toLocaleString() : '—';
+    const floorStr = floor > 0 ? floor.toFixed(4)+' \u039E' : 'FREE';
+    const safeStr = colData.safelist_status === 'verified' ? '\u2713 Verified' : colData.safelist_status || '—';
+
+    $('mdMeta').innerHTML =
+      mdMetaCard('Collection', MD.name) +
+      mdMetaCard('Contract', contract.slice(0,10)+'\u2026'+contract.slice(-4)) +
+      mdMetaCard('Floor Price', floorStr, floor>0?'var(--green)':'var(--text2)') +
+      mdMetaCard('Supply', supplyStr) +
+      mdMetaCard('Status', safeStr, colData.safelist_status==='verified'?'var(--green)':'var(--text2)') +
+      mdMetaCard('Category', colData.category || 'NFT');
+
+    // Pre-fill price
+    $('mdQty').value = 1;
+
+    $('mdResult').style.display = 'block';
+    mdStatus('\u2713 Contract resolved \u2014 configure and mint below.', 'ok');
+    log('Mint Direct: loaded '+MD.name+' ('+contract.slice(0,10)+'\u2026)', 'ok');
+
+  }catch(e){
+    mdStatus('Error: '+e.message, 'err');
+    log('Mint Direct error: '+e.message, 'err');
+  }
+});
+
+$('mdMintNow').addEventListener('click', ()=>{
+  const addr = $('mdAddr').value.trim();
+  if(!addr.match(/^0x[a-fA-F0-9]{40}$/)){ mdStatus('Enter your ETH wallet address first.','err'); return; }
+  if(!MD.contract){ mdStatus('Fetch a contract first.','err'); return; }
+
+  const qty = parseInt($('mdQty').value)||1;
+  const price = MD.price;
+  const maxGas = parseInt($('mdGas').value)||50;
+  const tip = parseFloat($('mdTip').value)||2;
+
+  // Build and open modal directly
+  const task = {
+    id: Date.now(), chain:'ETH', addr, contract:MD.contract,
+    fn: MD.fn, qty, price, mode:'manual',
+    maxGas, tip, status:'ready', time:null
+  };
+  openModal(task);
+  log('Mint Direct: firing \u26A1 '+MD.name+' \xd7'+qty+' @ '+price+'\u039E', 'ok');
+});
+
+$('mdAddTask').addEventListener('click', ()=>{
+  const addr = $('mdAddr').value.trim();
+  if(!addr.match(/^0x[a-fA-F0-9]{40}$/)){ mdStatus('Enter your ETH wallet address first.','err'); return; }
+  if(!MD.contract){ mdStatus('Fetch a contract first.','err'); return; }
+
+  // Switch chain selector to ETH and pre-fill the task form
+  document.querySelectorAll('#chainBar .mode-opt').forEach(b=>{
+    b.classList.toggle('active', b.dataset.chain==='ETH');
+  });
+  STATE.chain='ETH';
+  $('uAddr').value = addr;
+  $('cAddr').value = MD.contract;
+  $('mFn').value   = MD.fn;
+  $('mPrc').value  = MD.price;
+  $('mGas').value  = $('mdGas').value;
+  $('mTip').value  = $('mdTip').value;
+
+  // Scroll task form into view
+  $('uAddr').scrollIntoView({behavior:'smooth', block:'center'});
+  $('uAddr').focus();
+  mdStatus('\u2713 Pre-filled in the task form above \u2014 set mode and add.','ok');
+  log('Mint Direct: pre-filled task form for '+MD.name,'info');
+});
 
 const COLLAB_STAGES = [
   { id:'incoming', label:'Incoming',   color:'#4f8ef7' },
