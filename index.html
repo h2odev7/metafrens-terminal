@@ -47,6 +47,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .stat-pill .sv{font-size:13.5px;font-weight:700;color:var(--text);}
 .live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 7px var(--green);animation:pulse 2s infinite;flex-shrink:0;}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+@keyframes priceFlashUp{0%{background:rgba(16,217,122,.25);}100%{background:transparent;}}
+@keyframes priceFlashDown{0%{background:rgba(240,69,69,.25);}100%{background:transparent;}}
 #clk{font-size:11.5px;color:var(--text2);font-variant-numeric:tabular-nums;}
 
 .content-area{display:flex;flex:1;overflow:hidden;}
@@ -639,6 +641,22 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 
 <script>
 const $=id=>document.getElementById(id);
+// CORS proxy chain — tries each in order until one works
+async function corsGet(url, opts={}) {
+  const proxies = [
+    u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://cors-anywhere.herokuapp.com/${u}`,
+  ];
+  let lastErr;
+  for(const proxy of proxies){
+    try{
+      const r = await fetch(proxy(url), opts);
+      if(r.ok || r.status===200) return r;
+    }catch(e){ lastErr=e; }
+  }
+  throw lastErr||new Error('All CORS proxies failed for: '+url);
+}
 const CORS=u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`;
 const STATE={osKey:null,collections:[],tasks:[],saved:[],mode:'scheduled',chain:'ETH',ethPrice:0,btcPrice:0,gasPrice:0,tracked:['Metafrens01','OmistaBTC','The_sugargirl','thebeaksart','OnlyCapi']};
 
@@ -656,25 +674,92 @@ function setApi(k,s,lbl){
   lb.className='api-lbl '+(s==='live'?'live':s==='error'?'error':'');
 }
 
-/* BTC PRICE + FEES (mempool.space) */
-async function loadBtc(){
+/* ═══════════════════════════════════════════════
+   LIVE PRICES — extracted from CryptoCalc
+   Primary: CoinGecko · Fallback: CoinCap
+   Features: flash animation, % change, localStorage cache
+═══════════════════════════════════════════════ */
+const PRICE_CACHE_KEY = 'mf_crypto_prices';
+let _lastPrices = {};
+
+// Seed from cache instantly so topbar isn't blank on load
+(()=>{
   try{
-    const r=await fetch(CORS('https://api.coinbase.com/v2/prices/BTC-USD/spot'));
-    const d=await r.json();
-    STATE.btcPrice=parseFloat(d.data.amount);
-    $('btcP').textContent='$'+STATE.btcPrice.toLocaleString('en-US',{maximumFractionDigits:0});
-    log('BTC $'+STATE.btcPrice.toLocaleString(),'ok');
-  }catch(e){$('btcP').textContent='$—';}
+    const c = JSON.parse(localStorage.getItem(PRICE_CACHE_KEY)||'{}');
+    if(c.btc) STATE.btcPrice = c.btc;
+    if(c.eth) STATE.ethPrice = c.eth;
+    if(c.sol) STATE.solPrice = c.sol;
+    applyPriceUI(c);
+  }catch(e){}
+})();
+
+function applyPriceUI(p){
+  if(p.btc) _flashPrice('btcP', p.btc, _lastPrices.btc, 0);
+  if(p.eth) _flashPrice('ethP', p.eth, _lastPrices.eth, 0);
+  if(p.sol) _flashPrice('solP', p.sol, _lastPrices.sol, 2);
+  _lastPrices = {..._lastPrices, ...p};
 }
 
-async function loadSol(){
+function _flashPrice(elId, newPrice, oldPrice, decimals){
+  const el = $(elId);
+  if(!el) return;
+  let arrow='', pct='', color='var(--text)';
+  if(oldPrice && oldPrice !== newPrice){
+    const diff = newPrice - oldPrice;
+    const p = (diff/oldPrice)*100;
+    if(diff > 0){
+      arrow=' ↑'; pct=` +${p.toFixed(2)}%`; color='var(--green)';
+      el.parentElement.style.animation='none';
+      el.parentElement.offsetHeight; // reflow
+      el.parentElement.style.animation='priceFlashUp .6s ease';
+    } else {
+      arrow=' ↓'; pct=` ${p.toFixed(2)}%`; color='var(--red)';
+      el.parentElement.style.animation='none';
+      el.parentElement.offsetHeight;
+      el.parentElement.style.animation='priceFlashDown .6s ease';
+    }
+    setTimeout(()=>{ el.parentElement.style.animation=''; }, 700);
+  }
+  const fmt = '$'+newPrice.toLocaleString('en-US',{maximumFractionDigits:decimals});
+  el.innerHTML = `<span style="color:${color};transition:color .3s;">${fmt}</span><span style="font-size:9px;opacity:.75;margin-left:2px;color:${color};">${pct}</span>`;
+}
+
+async function loadPrices(){
+  let p = null;
+  // Primary: CoinGecko (no proxy needed — public endpoint)
   try{
-    const r=await fetch(CORS('https://api.coinbase.com/v2/prices/SOL-USD/spot'));
-    const d=await r.json();
-    const price=parseFloat(d.data.amount);
-    $('solP').textContent='$'+price.toLocaleString('en-US',{maximumFractionDigits:2});
-    log('SOL $'+price.toFixed(2),'ok');
-  }catch(e){if($('solP'))$('solP').textContent='$—';}
+    const r = await Promise.race([
+      fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd'),
+      new Promise((_,rej)=>setTimeout(()=>rej('timeout'),4000))
+    ]);
+    const d = await r.json();
+    p = { btc: d.bitcoin.usd, eth: d.ethereum.usd, sol: d.solana.usd };
+  }catch(e){
+    // Fallback: CoinCap (also no proxy needed)
+    try{
+      const [br,er,sr] = await Promise.all([
+        fetch('https://api.coincap.io/v2/assets/bitcoin'),
+        fetch('https://api.coincap.io/v2/assets/ethereum'),
+        fetch('https://api.coincap.io/v2/assets/solana'),
+      ]);
+      const [bd,ed,sd] = await Promise.all([br.json(),er.json(),sr.json()]);
+      p = {
+        btc: parseFloat(bd.data.priceUsd),
+        eth: parseFloat(ed.data.priceUsd),
+        sol: parseFloat(sd.data.priceUsd),
+      };
+    }catch(e2){
+      log('Price fetch failed: '+e2,'warn');
+      return;
+    }
+  }
+  if(!p) return;
+  STATE.btcPrice = p.btc;
+  STATE.ethPrice = p.eth;
+  STATE.solPrice = p.sol;
+  localStorage.setItem(PRICE_CACHE_KEY, JSON.stringify(p));
+  applyPriceUI(p);
+  setApi('eth','live','ETH/Gas: LIVE');
 }
 
 /* ORDINALS — Hiro API · Marketplaces: Satflow + Ord.net */
@@ -682,7 +767,7 @@ async function fetchOrdinals(){
   // Always pin your collections first regardless of API success
   const yourCols=await Promise.all(MY_COLLECTIONS.map(async mc=>{
     try{
-      const hr=await fetch(CORS(`https://api.hiro.so/ordinals/v1/collections?name=${encodeURIComponent(mc.name)}`));
+      const hr=await corsGet(`https://api.hiro.so/ordinals/v1/collections?name=${encodeURIComponent(mc.name)}`);
       const hd=await hr.json();
       const col=hd.results?.[0]||{};
       const floorBtc=col.floor_price ? col.floor_price/1e8 : (mc.price!=null ? mc.price : null);
@@ -692,7 +777,7 @@ async function fetchOrdinals(){
 
   try{
     // Hiro trending collections
-    const r=await fetch(CORS('https://api.hiro.so/ordinals/v1/collections?order_by=volume&order=desc&limit=20'));
+    const r=await corsGet('https://api.hiro.so/ordinals/v1/collections?order_by=volume&order=desc&limit=20');
     const d=await r.json();
     const list=d.results||[];
     const ordCols=list.slice(0,12).map(c=>{
@@ -727,7 +812,7 @@ async function fetchOrdinals(){
 /* OPENSEA */
 async function getOsKey(){
   try{
-    const r=await fetch(CORS('https://api.opensea.io/api/v2/auth/keys'),{method:'POST'});
+    const r=await corsGet('https://api.opensea.io/api/v2/auth/keys',{method:'POST'});
     const d=await r.json();
     if(d.api_key){STATE.osKey=d.api_key;return d.api_key;}
   }catch(e){}
@@ -738,13 +823,13 @@ async function fetchOs(){
   try{
     const key=STATE.osKey||await getOsKey();
     const h={'Accept':'application/json','x-api-key':key};
-    const r=await fetch(CORS('https://api.opensea.io/api/v2/collections?chain=ethereum&order_by=seven_day_volume&limit=16'),{headers:h});
+    const r=await corsGet('https://api.opensea.io/api/v2/collections?chain=ethereum&order_by=seven_day_volume&limit=16',{headers:h});
     const d=await r.json();
     if(!d.collections?.length)throw new Error('no data');
     const cols=await Promise.all(d.collections.slice(0,10).map(async c=>{
       let floor=0,vol24=0,chg=0;
       try{
-        const sr=await fetch(CORS(`https://api.opensea.io/api/v2/collections/${c.collection}/stats`),{headers:h});
+        const sr=await corsGet(`https://api.opensea.io/api/v2/collections/${c.collection}/stats`,{headers:h});
         const sd=await sr.json();
         if(sd.total){floor=sd.total.floor_price||0;vol24=sd.intervals?.[0]?.volume||0;chg=sd.intervals?.[0]?.volume_change||0;}
       }catch(e){}
@@ -766,7 +851,7 @@ async function fetchOs(){
 /* COINGECKO */
 async function fetchCg(){
   try{
-    const r=await fetch(CORS('https://api.coingecko.com/api/v3/nfts/list?order=h24_volume_native_desc&per_page=10&page=1'));
+    const r=await corsGet('https://api.coingecko.com/api/v3/nfts/list?order=h24_volume_native_desc&per_page=10&page=1');
     const data=await r.json();
     if(!Array.isArray(data)||!data.length)throw new Error('no data');
     const items=data.slice(0,6).map(n=>({name:n.name,slug:n.id,handle:'@'+n.id.replace(/-/g,'').slice(0,15),supply:0,price:n.floor_price_in_native_currency||0,vol24:n.h24_volume_in_native_currency||0,change:n.floor_price_24h_percentage_change||0,image:n.image?.small||null,verified:false,source:'coingecko',tag:(n.floor_price_24h_percentage_change||0)>5?'PUMPING':'TRENDING',status:'live'}));
@@ -816,20 +901,17 @@ function loadXFallback(){
 }
 
 /* ETH + GAS */
-async function loadEth(){
-  try{
-    const r=await fetch('https://api.coinbase.com/v2/prices/ETH-USD/spot');
-    const d=await r.json();STATE.ethPrice=parseFloat(d.data.amount);
-    $('ethP').textContent='$'+STATE.ethPrice.toLocaleString('en-US',{maximumFractionDigits:0});
-    setApi('eth','live','ETH/Gas: LIVE');
-  }catch{$('ethP').textContent='$—';setApi('eth','error','ETH: error');}
-}
+// loadEth delegates to unified loadPrices
+async function loadEth(){ await loadPrices(); }
+async function loadBtc(){ await loadPrices(); }
+async function loadSol(){ await loadPrices(); }
+
 async function loadGas(){
   try{
     const r=await fetch('https://ethereum.publicnode.com',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'eth_gasPrice',params:[],id:1})});
     const d=await r.json();
-    if(d.result){const g=parseInt(d.result,16)/1e9;STATE.gasPrice=g;$('gasP').textContent=g.toFixed(1)+' gwei';}
-  }catch{$('gasP').textContent='—';}
+    if(d.result){ STATE.gasPrice=parseInt(d.result,16)/1e9; }
+  }catch(e){}
 }
 
 /* FALLBACK */
@@ -1059,7 +1141,7 @@ function tick(){
       if(!t._lastPoll||now-t._lastPoll>=10){
         t._lastPoll=now;
         // Try calling the contract — if it responds the mint is open
-        fetch(CORS(`https://ethereum.publicnode.com`),{
+        corsGet(`https://ethereum.publicnode.com`,{
           method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({jsonrpc:'2.0',method:'eth_call',params:[{to:t.contract,data:'0x'+kH(t.fn||'mint(uint256)')+'0'.repeat(64)},'latest'],id:1})
         }).then(r=>r.json()).then(d=>{
@@ -1162,12 +1244,13 @@ function log(msg,type=''){
 }
 
 async function init(){
-  updateClock();setInterval(updateClock,1000);setInterval(tick,1000);setInterval(loadEth,60e3);setInterval(loadGas,30e3);setInterval(loadBtc,60e3);setInterval(loadSol,60e3);
+  updateClock();setInterval(updateClock,1000);setInterval(tick,1000);
+  setInterval(loadPrices,30e3);setInterval(loadGas,60e3);
   setInterval(()=>{fetchOs();fetchCg();fetchOrdinals();},5*60e3);
   const t=new Date();t.setHours(t.getHours()+1);$('mTime').value=t.toISOString().slice(0,16);
   renderTracked();renderTasks();renderSaved();
   log('Connecting to live data sources...','info');
-  await Promise.all([loadEth(),loadGas(),loadBtc(),loadSol(),getOsKey().then(()=>fetchOs()),fetchCg(),fetchOrdinals()]);
+  await Promise.all([loadPrices(),loadGas(),getOsKey().then(()=>fetchOs()),fetchCg(),fetchOrdinals()]);
   setTimeout(()=>loadTwEmbeds(),600);
 }
 /* ═══════════════════════════════════════
@@ -1272,13 +1355,13 @@ async function fetchEthContract(parsed){
   let colData = null;
 
   if(parsed.type==='slug'){
-    const r = await fetch(CORS(`https://api.opensea.io/api/v2/collections/${parsed.value}`),{headers:h});
+    const r = await corsGet(`https://api.opensea.io/api/v2/collections/${parsed.value}`,{headers:h});
     colData = await r.json();
   } else {
-    const r = await fetch(CORS(`https://api.opensea.io/api/v2/chain/ethereum/contract/${parsed.value}`),{headers:h});
+    const r = await corsGet(`https://api.opensea.io/api/v2/chain/ethereum/contract/${parsed.value}`,{headers:h});
     const d = await r.json();
     if(d.collection){
-      const r2 = await fetch(CORS(`https://api.opensea.io/api/v2/collections/${d.collection}`),{headers:h});
+      const r2 = await corsGet(`https://api.opensea.io/api/v2/collections/${d.collection}`,{headers:h});
       colData = await r2.json();
     }
   }
@@ -1289,7 +1372,7 @@ async function fetchEthContract(parsed){
 
   let floor = 0;
   try{
-    const sr = await fetch(CORS(`https://api.opensea.io/api/v2/collections/${colData.collection}/stats`),{headers:h});
+    const sr = await corsGet(`https://api.opensea.io/api/v2/collections/${colData.collection}/stats`,{headers:h});
     const sd = await sr.json();
     floor = sd.total?.floor_price||0;
   }catch(e){}
@@ -1323,7 +1406,7 @@ async function fetchBtcContract(parsed){
   let image = null;
 
   try{
-    const r = await fetch(CORS(`https://api.hiro.so/ordinals/v1/collections?name=${encodeURIComponent(parsed.value)}`));
+    const r = await corsGet(`https://api.hiro.so/ordinals/v1/collections?name=${encodeURIComponent(parsed.value)}`);
     const d = await r.json();
     const col = d.results?.[0]||{};
     if(col.collection_id){
@@ -1373,7 +1456,7 @@ async function fetchSolContract(parsed){
 
   if(parsed.platform==='magiceden'){
     try{
-      const r = await fetch(CORS(`https://api-mainnet.magiceden.dev/v2/collections/${parsed.value}`));
+      const r = await corsGet(`https://api-mainnet.magiceden.dev/v2/collections/${parsed.value}`);
       const d = await r.json();
       if(d.name){
         colName = d.name;
