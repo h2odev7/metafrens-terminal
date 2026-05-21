@@ -317,6 +317,41 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   .nav-icon{width:26px;height:26px;}
   .page{padding:12px 10px;}
 }
+/* ── RADAR ── */
+.radar-grid{display:grid;grid-template-columns:340px 1fr;gap:18px;}
+.radar-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
+.radar-panel h4{font-family:var(--font-d);font-weight:800;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:14px;padding-bottom:7px;border-bottom:1px solid var(--border);}
+.radar-status{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:14px;}
+.radar-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.radar-dot.off{background:var(--text3);}
+.radar-dot.on{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.5s infinite;}
+.radar-dot.detecting{background:var(--yellow);box-shadow:0 0 8px var(--yellow);animation:pulse .8s infinite;}
+.radar-status-text{font-size:12px;font-weight:600;color:var(--text);}
+.radar-status-sub{font-size:10px;color:var(--text3);}
+.watch-tag{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--text2);margin:3px;}
+.watch-tag .chain{font-size:8px;padding:1px 5px;border-radius:3px;font-weight:700;}
+.watch-tag .rm{background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:0 2px;margin-left:2px;}
+.watch-tag .rm:hover{color:var(--red);}
+.radar-event{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;animation:radarIn .3s ease;}
+@keyframes radarIn{from{opacity:0;transform:translateX(-8px);}to{opacity:1;transform:none;}}
+.radar-event.new-mint{border-left:3px solid var(--green);}
+.radar-event.new-inscription{border-left:3px solid var(--btc);}
+.radar-event.new-sol{border-left:3px solid #9945ff;}
+.radar-event-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.radar-event-body{flex:1;min-width:0;}
+.radar-event-title{font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.radar-event-meta{font-size:10.5px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap;}
+.radar-event-meta a{color:var(--accent);text-decoration:none;}
+.radar-event-meta a:hover{text-decoration:underline;}
+.radar-event-time{font-size:9.5px;color:var(--text3);flex-shrink:0;margin-top:2px;}
+.radar-empty{text-align:center;padding:40px 20px;color:var(--text3);}
+.radar-empty .ei{font-size:32px;margin-bottom:8px;opacity:.2;}
+.chain-tabs-radar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:14px;}
+.ctr{padding:7px 14px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:var(--font-b);font-size:11px;font-weight:600;cursor:pointer;margin-bottom:-1px;transition:all .15s;}
+.ctr.active{color:var(--accent);border-bottom-color:var(--accent);}
+.notif-banner{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);border-radius:var(--radius-sm);margin-bottom:14px;font-size:12px;}
+.notif-banner.granted{background:rgba(16,217,122,.08);border-color:rgba(16,217,122,.2);}
+@media(max-width:900px){.radar-grid{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -351,6 +386,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </div>
       <span>Saved</span>
+    </button>
+    <button class="nav-item" data-tab="radar">
+      <div class="nav-icon" style="background:linear-gradient(135deg,#06b6d4,#0891b2)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
+      </div>
+      <span>Radar</span>
     </button>
   </nav>
 </aside>
@@ -651,6 +692,147 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 
         <!-- PIPELINE BOARD -->
         <div class="pipeline" id="collabPipeline"></div>
+      </div>
+
+      <!-- RADAR -->
+      <div class="page" id="pg-radar">
+        <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div class="page-title">Mint Radar</div>
+            <div class="page-desc">On-chain tracker — detects new NFT mints live across ETH, BTC Ordinals &amp; Solana. Browser notifications when something fires.</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" id="radarNotifBtn">&#128276; Enable Notifications</button>
+            <button class="btn btn-primary btn-sm" id="radarStartBtn">&#9654; Start Radar</button>
+          </div>
+        </div>
+
+        <!-- NOTIFICATION BANNER -->
+        <div class="notif-banner" id="radarNotifBanner">
+          <span style="font-size:16px;">&#128276;</span>
+          <div>
+            <div style="font-weight:700;color:var(--text);">Browser notifications not enabled</div>
+            <div style="color:var(--text3);font-size:11px;">Click "Enable Notifications" so Radar can alert you even when the tab is in the background.</div>
+          </div>
+        </div>
+
+        <div class="radar-grid">
+          <!-- LEFT — CONFIG -->
+          <div>
+            <!-- STATUS -->
+            <div class="radar-status" id="radarStatus">
+              <div class="radar-dot off" id="radarDot"></div>
+              <div>
+                <div class="radar-status-text" id="radarStatusText">Radar offline</div>
+                <div class="radar-status-sub" id="radarStatusSub">Start radar to begin scanning</div>
+              </div>
+            </div>
+
+            <!-- CHAIN SELECTOR -->
+            <div class="radar-panel" style="margin-bottom:14px;">
+              <h4>Chains to Watch</h4>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                  <input type="checkbox" id="watchEth" checked style="accent-color:var(--blue);width:15px;height:15px;"/>
+                  <span style="font-size:12.5px;font-weight:600;color:var(--blue);">&#926; Ethereum</span>
+                  <span style="font-size:10px;color:var(--text3);">Polls ETH RPC for Transfer(0x0→) events</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                  <input type="checkbox" id="watchBtc" checked style="accent-color:var(--btc);width:15px;height:15px;"/>
+                  <span style="font-size:12.5px;font-weight:600;color:var(--btc);">&#8383; Ordinals</span>
+                  <span style="font-size:10px;color:var(--text3);">Polls Hiro API for new inscriptions</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                  <input type="checkbox" id="watchSol" checked style="accent-color:#9945ff;width:15px;height:15px;"/>
+                  <span style="font-size:12.5px;font-weight:600;color:#9945ff;">&#9675; Solana</span>
+                  <span style="font-size:10px;color:var(--text3);">Polls Solana RPC for Metaplex mints</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- WATCH LIST -->
+            <div class="radar-panel" style="margin-bottom:14px;">
+              <h4>Watch Specific Contracts / Collections</h4>
+              <div style="font-size:11px;color:var(--text3);margin-bottom:10px;">Add a contract address (ETH), collection slug (BTC), or program ID (SOL) to get targeted alerts.</div>
+              <div style="display:flex;gap:8px;margin-bottom:10px;">
+                <select id="radarAddChain" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;">
+                  <option value="ETH">ETH</option>
+                  <option value="BTC">BTC</option>
+                  <option value="SOL">SOL</option>
+                </select>
+                <input type="text" id="radarAddInput" placeholder="0x contract / slug / program ID" style="flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;"/>
+                <button class="btn btn-primary btn-sm" id="radarAddBtn">+ Add</button>
+              </div>
+              <div id="radarWatchList" style="display:flex;flex-wrap:wrap;gap:4px;min-height:24px;">
+                <span style="font-size:10.5px;color:var(--text3);padding:4px;">No specific targets — watching all new mints</span>
+              </div>
+            </div>
+
+            <!-- SCAN CONFIG -->
+            <div class="radar-panel">
+              <h4>Scan Settings</h4>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div class="lf" style="margin:0;"><label>Poll Interval (seconds)</label>
+                  <input type="number" id="radarInterval" value="15" min="5" max="120" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:12px;outline:none;"/>
+                </div>
+                <div class="lf" style="margin:0;"><label>Max Events Shown</label>
+                  <input type="number" id="radarMaxEvents" value="50" min="10" max="200" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:12px;outline:none;"/>
+                </div>
+                <div class="lf" style="margin:0;"><label>Min Mint Value (ETH)</label>
+                  <input type="number" id="radarMinVal" value="0" min="0" step="0.001" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:12px;outline:none;"/>
+                </div>
+                <div class="lf" style="margin:0;"><label>Alert Sound</label>
+                  <select id="radarSound" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:12px;outline:none;">
+                    <option value="on">On</option>
+                    <option value="off">Off</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT — LIVE FEED -->
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+              <div style="font-family:var(--font-d);font-size:13px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px;">
+                LIVE MINT FEED
+                <span style="font-size:9px;padding:2px 7px;background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.2);color:#06b6d4;border-radius:20px;" id="radarEventCount">0 events</span>
+              </div>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-ghost btn-sm" id="radarFilterAll" style="font-size:10px;" data-filter="all">All</button>
+                <button class="btn btn-ghost btn-sm" id="radarFilterEth" style="font-size:10px;color:var(--blue);" data-filter="ETH">&#926; ETH</button>
+                <button class="btn btn-ghost btn-sm" id="radarFilterBtc" style="font-size:10px;color:var(--btc);" data-filter="BTC">&#8383; BTC</button>
+                <button class="btn btn-ghost btn-sm" id="radarFilterSol" style="font-size:10px;color:#9945ff;" data-filter="SOL">&#9675; SOL</button>
+                <button class="btn btn-ghost btn-sm" id="radarClearBtn" style="font-size:10px;">&#128465; Clear</button>
+              </div>
+            </div>
+
+            <!-- STATS ROW -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;">
+                <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;">Total Detected</div>
+                <div style="font-family:var(--font-d);font-size:20px;font-weight:800;color:var(--text);" id="rStatTotal">0</div>
+              </div>
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;">
+                <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;">ETH Mints</div>
+                <div style="font-family:var(--font-d);font-size:20px;font-weight:800;color:var(--blue);" id="rStatEth">0</div>
+              </div>
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;">
+                <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;">Inscriptions</div>
+                <div style="font-family:var(--font-d);font-size:20px;font-weight:800;color:var(--btc);" id="rStatBtc">0</div>
+              </div>
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;">
+                <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;">SOL Mints</div>
+                <div style="font-family:var(--font-d);font-size:20px;font-weight:800;color:#9945ff;" id="rStatSol">0</div>
+              </div>
+            </div>
+
+            <!-- EVENTS -->
+            <div id="radarFeed">
+              <div class="radar-empty"><div class="ei">&#128251;</div><div style="font-size:13px;font-weight:600;color:var(--text2);">Radar is offline</div><div style="font-size:11.5px;margin-top:4px;">Hit Start Radar to begin scanning all chains for new mints.</div></div>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div><!-- /right-panel -->
@@ -1611,6 +1793,197 @@ $('mdAddTask').addEventListener('click', ()=>{
   mdStatus('\u2713 Pre-filled in task form \u2014 set mode and add.','ok');
   log('Mint Direct: pre-filled ['+MD.chain+'] task for '+MD.name,'info');
 });
+
+/* ═══════════════════════════════════════════════════
+   MINT RADAR — on-chain tracker
+   ETH: Transfer(0x0→) via eth_getLogs
+   BTC: Hiro API new inscriptions
+   SOL: Solana RPC Metaplex signatures
+═══════════════════════════════════════════════════ */
+const RADAR={running:false,timer:null,watchList:[],events:[],stats:{total:0,eth:0,btc:0,sol:0},filter:'all',lastEthBlock:null,lastBtcInscription:null,lastSolSig:null,notifGranted:false};
+const TRANSFER_TOPIC='0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+const ZERO_ADDR='0x0000000000000000000000000000000000000000000000000000000000000000';
+const ETH_RPC='https://ethereum.publicnode.com';
+const HIRO_INSC='https://api.hiro.so/ordinals/v1/inscriptions';
+const SOL_RPC='https://api.mainnet-beta.solana.com';
+const METAPLEX_PROG='metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s';
+
+async function radarRequestNotif(){
+  if(!('Notification' in window)){alert('Browser does not support notifications.');return;}
+  const p=await Notification.requestPermission();
+  RADAR.notifGranted=p==='granted';updateNotifBanner();
+}
+function updateNotifBanner(){
+  const b=$('radarNotifBanner');if(!b)return;
+  if(Notification.permission==='granted'){RADAR.notifGranted=true;b.style.display='none';return;}
+  b.classList.remove('granted');
+}
+function fireNotif(title,body,chain){
+  log('\u26A0 RADAR ['+chain+']: '+title+' \u2014 '+body,'ok');
+  if(RADAR.notifGranted&&Notification.permission==='granted') new Notification('\u26A1 '+title,{body});
+  if($('radarSound')?.value==='on'){
+    try{const ctx=new(window.AudioContext||window.webkitAudioContext)();const o=ctx.createOscillator();const g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=chain==='ETH'?880:chain==='BTC'?660:550;g.gain.setValueAtTime(.3,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.3);o.start();o.stop(ctx.currentTime+.3);}catch(e){}
+  }
+}
+function renderRadarWatchList(){
+  const el=$('radarWatchList');if(!el)return;
+  if(!RADAR.watchList.length){el.innerHTML='<span style="font-size:10.5px;color:var(--text3);padding:4px;">No specific targets \u2014 watching all new mints</span>';return;}
+  const cc={ETH:'var(--blue)',BTC:'var(--btc)',SOL:'#9945ff'};
+  el.innerHTML=RADAR.watchList.map((w,i)=>`<span class="watch-tag"><span class="chain" style="background:${cc[w.chain]}22;color:${cc[w.chain]};">${w.chain}</span>${w.address.slice(0,14)}${w.address.length>14?'\u2026':''}<button class="rm" onclick="radarRemoveWatch(${i})">&#215;</button></span>`).join('');
+}
+function radarRemoveWatch(i){RADAR.watchList.splice(i,1);renderRadarWatchList();}
+$('radarAddBtn')?.addEventListener('click',()=>{
+  const addr=$('radarAddInput').value.trim();const chain=$('radarAddChain').value;
+  if(!addr)return;
+  RADAR.watchList.push({chain,address:addr});$('radarAddInput').value='';
+  renderRadarWatchList();log('Radar watching ['+chain+'] '+addr.slice(0,12)+'\u2026','info');
+});
+$('radarStartBtn')?.addEventListener('click',()=>{if(RADAR.running)stopRadar();else startRadar();});
+function startRadar(){
+  RADAR.running=true;RADAR.lastEthBlock=null;RADAR.lastBtcInscription=null;RADAR.lastSolSig=null;
+  updateRStatus('on','Radar scanning\u2026','Polling all chains for new mints');
+  $('radarStartBtn').textContent='\u23F9 Stop Radar';$('radarStartBtn').className='btn btn-danger btn-sm';
+  const iv=(parseInt($('radarInterval')?.value)||15)*1000;
+  radarScan();RADAR.timer=setInterval(radarScan,iv);
+  log('Radar started \u2014 polling every '+(iv/1000)+'s','ok');
+}
+function stopRadar(){
+  RADAR.running=false;clearInterval(RADAR.timer);
+  updateRStatus('off','Radar offline','Start radar to begin scanning');
+  $('radarStartBtn').textContent='\u25B6 Start Radar';$('radarStartBtn').className='btn btn-primary btn-sm';
+  log('Radar stopped','warn');
+}
+function updateRStatus(state,text,sub){
+  const d=$('radarDot'),t=$('radarStatusText'),s=$('radarStatusSub');
+  if(d)d.className='radar-dot '+state;if(t)t.textContent=text;if(s)s.textContent=sub;
+}
+async function radarScan(){
+  if(!RADAR.running)return;
+  updateRStatus('detecting','Scanning chains\u2026','Checking for new mints');
+  await Promise.allSettled([
+    $('watchEth')?.checked?scanEth():null,
+    $('watchBtc')?.checked?scanBtc():null,
+    $('watchSol')?.checked?scanSol():null,
+  ].filter(Boolean));
+  updateRStatus('on','Radar active','Last scan: '+new Date().toLocaleTimeString('en-US',{hour12:false}));
+}
+async function scanEth(){
+  try{
+    const br=await fetch(ETH_RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'eth_blockNumber',params:[],id:1})});
+    const bd=await br.json();const latest=parseInt(bd.result,16);
+    if(!RADAR.lastEthBlock){RADAR.lastEthBlock=latest-2;}
+    if(latest<=RADAR.lastEthBlock)return;
+    const addresses=RADAR.watchList.filter(w=>w.chain==='ETH').map(w=>w.address);
+    const filter={fromBlock:'0x'+RADAR.lastEthBlock.toString(16),toBlock:'0x'+latest.toString(16),topics:[TRANSFER_TOPIC,ZERO_ADDR],...(addresses.length?{address:addresses}:{})};
+    const lr=await fetch(ETH_RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'eth_getLogs',params:[filter],id:2})});
+    const ld=await lr.json();const logs=ld.result||[];
+    RADAR.lastEthBlock=latest;
+    const seen=new Set(RADAR.events.filter(e=>e.chain==='ETH').map(e=>e.id));
+    const minVal=parseFloat($('radarMinVal')?.value)||0;
+    for(const l of logs.slice(0,20)){
+      const id=l.transactionHash+'_'+(l.topics[3]||'0');
+      if(seen.has(id))continue;
+      const tokenId=parseInt(l.topics[3]||'0x0',16);
+      let value=0;
+      if(minVal>0){try{const tr=await fetch(ETH_RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'eth_getTransactionByHash',params:[l.transactionHash],id:3})});const td=await tr.json();value=parseInt(td.result?.value||'0x0',16)/1e18;if(value<minVal)continue;}catch(e){}}
+      addRadarEvent({id,chain:'ETH',type:'new-mint',title:'New ETH Mint',contract:l.address,tokenId,txHash:l.transactionHash,blockNum:parseInt(l.blockNumber,16),value,ts:Date.now()});
+      fireNotif('New ETH Mint',l.address.slice(0,12)+'\u2026 Token #'+tokenId+(value>0?' \u2014 '+value.toFixed(4)+'\u039E':''),'ETH');
+    }
+  }catch(e){log('Radar ETH error: '+e.message,'warn');}
+}
+async function scanBtc(){
+  try{
+    const r=await corsGet(HIRO_INSC+'?order_by=genesis_block_height&order=desc&limit=20');
+    const d=await r.json();const inscriptions=d.results||[];
+    if(!inscriptions.length)return;
+    const latestId=inscriptions[0].id;
+    if(RADAR.lastBtcInscription===latestId)return;
+    const seen=new Set(RADAR.events.filter(e=>e.chain==='BTC').map(e=>e.id));
+    const slugs=RADAR.watchList.filter(w=>w.chain==='BTC').map(w=>w.address.toLowerCase());
+    for(const insc of inscriptions.slice(0,10)){
+      if(seen.has(insc.id))continue;
+      if(slugs.length&&!slugs.some(s=>insc.collection_id?.toLowerCase().includes(s)))continue;
+      addRadarEvent({id:insc.id,chain:'BTC',type:'new-inscription',title:'New Inscription',contract:insc.collection_id||'uncategorized',tokenId:insc.number,txHash:insc.genesis_tx_id,blockNum:insc.genesis_block_height,value:0,ts:Date.now()});
+      fireNotif('New Ordinal Inscription','#'+insc.number+' — '+(insc.collection_id||'uncategorized'),'BTC');
+    }
+    RADAR.lastBtcInscription=latestId;
+  }catch(e){log('Radar BTC error: '+e.message,'warn');}
+}
+async function scanSol(){
+  try{
+    const body={jsonrpc:'2.0',id:1,method:'getSignaturesForAddress',params:[METAPLEX_PROG,{limit:10,...(RADAR.lastSolSig?{until:RADAR.lastSolSig}:{})}]};
+    const r=await fetch(SOL_RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();const sigs=d.result||[];
+    if(!sigs.length)return;
+    const latestSig=sigs[0].signature;
+    if(RADAR.lastSolSig===latestSig)return;
+    const seen=new Set(RADAR.events.filter(e=>e.chain==='SOL').map(e=>e.txHash));
+    for(const s of sigs.filter(s=>!s.err&&!seen.has(s.signature)).slice(0,5)){
+      addRadarEvent({id:s.signature,chain:'SOL',type:'new-sol',title:'New Solana Mint',contract:'Metaplex',tokenId:null,txHash:s.signature,blockNum:s.slot,value:0,ts:(s.blockTime||0)*1000||Date.now()});
+      fireNotif('New Solana Mint','tx: '+s.signature.slice(0,16)+'\u2026','SOL');
+    }
+    RADAR.lastSolSig=latestSig;
+  }catch(e){log('Radar SOL error: '+e.message,'warn');}
+}
+function addRadarEvent(event){
+  if(RADAR.events.find(e=>e.id===event.id))return;
+  RADAR.events.unshift(event);
+  RADAR.stats.total++;
+  if(event.chain==='ETH')RADAR.stats.eth++;
+  if(event.chain==='BTC')RADAR.stats.btc++;
+  if(event.chain==='SOL')RADAR.stats.sol++;
+  const max=parseInt($('radarMaxEvents')?.value)||50;
+  if(RADAR.events.length>max)RADAR.events.length=max;
+  renderRadarFeed();updateRadarStats();
+}
+function renderRadarFeed(){
+  const feed=$('radarFeed');if(!feed)return;
+  const list=RADAR.filter==='all'?RADAR.events:RADAR.events.filter(e=>e.chain===RADAR.filter);
+  if(!list.length){
+    feed.innerHTML='<div class="radar-empty"><div class="ei">&#128251;</div><div style="font-size:13px;font-weight:600;color:var(--text2);">'+(RADAR.running?'No mints detected yet':'Radar is offline')+'</div><div style="font-size:11.5px;margin-top:4px;">'+(RADAR.running?'Scanning \u2014 events will appear here':'Hit Start Radar to begin scanning.')+'</div></div>';
+    return;
+  }
+  const cc={ETH:'var(--blue)',BTC:'var(--btc)',SOL:'#9945ff'};
+  const cb={ETH:'rgba(79,142,247,.15)',BTC:'rgba(249,115,22,.15)',SOL:'rgba(153,69,255,.15)'};
+  const exUrl=e=>e.chain==='ETH'?`https://etherscan.io/tx/${e.txHash}`:e.chain==='BTC'?`https://ordinals.com/tx/${e.txHash}`:`https://solscan.io/tx/${e.txHash}`;
+  feed.innerHTML=list.map(e=>{
+    const ago=Math.round((Date.now()-e.ts)/1000);
+    const agoStr=ago<60?ago+'s ago':Math.round(ago/60)+'m ago';
+    const icon=e.chain==='ETH'?'&#926;':e.chain==='BTC'?'&#8383;':'&#9675;';
+    const valStr=e.chain==='ETH'&&e.value>0?' &mdash; '+e.value.toFixed(4)+' &Xi;':'';
+    const tokStr=e.tokenId!=null?' #'+e.tokenId:'';
+    return`<div class="radar-event ${e.type}">
+      <div class="radar-event-icon" style="background:${cb[e.chain]};color:${cc[e.chain]};">${icon}</div>
+      <div class="radar-event-body">
+        <div class="radar-event-title">${e.title}${tokStr}${valStr}</div>
+        <div class="radar-event-meta">
+          <span style="font-family:monospace;">${e.contract.slice(0,20)}</span>
+          ${e.blockNum?'<span>Block '+e.blockNum.toLocaleString()+'</span>':''}
+          <a href="${exUrl(e)}" target="_blank" rel="noopener">Tx &#8599;</a>
+        </div>
+      </div>
+      <div class="radar-event-time">${agoStr}</div>
+    </div>`;
+  }).join('');
+}
+function updateRadarStats(){
+  const s=(id,v)=>{const el=$(id);if(el)el.textContent=v;};
+  s('rStatTotal',RADAR.stats.total);s('rStatEth',RADAR.stats.eth);s('rStatBtc',RADAR.stats.btc);s('rStatSol',RADAR.stats.sol);
+  s('radarEventCount',RADAR.stats.total+' events');
+}
+['radarFilterAll','radarFilterEth','radarFilterBtc','radarFilterSol'].forEach(id=>{
+  const el=$(id);if(!el)return;
+  el.addEventListener('click',()=>{
+    RADAR.filter=el.dataset.filter;
+    ['radarFilterAll','radarFilterEth','radarFilterBtc','radarFilterSol'].forEach(i=>{const b=$(i);if(b)b.style.borderColor='var(--border)';});
+    el.style.borderColor=RADAR.filter==='all'?'var(--accent)':RADAR.filter==='ETH'?'var(--blue)':RADAR.filter==='BTC'?'var(--btc)':'#9945ff';
+    renderRadarFeed();
+  });
+});
+$('radarClearBtn')?.addEventListener('click',()=>{RADAR.events=[];RADAR.stats={total:0,eth:0,btc:0,sol:0};renderRadarFeed();updateRadarStats();});
+$('radarNotifBtn')?.addEventListener('click',radarRequestNotif);
+if(Notification.permission==='granted')RADAR.notifGranted=true;
+updateNotifBanner();
 
 const COLLAB_STAGES = [
   { id:'incoming', label:'Incoming',   color:'#4f8ef7' },
