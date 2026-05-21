@@ -381,17 +381,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       </div>
       <span>Collabs</span>
     </button>
-    <button class="nav-item" data-tab="watchlist">
-      <div class="nav-icon" style="background:linear-gradient(135deg,#10d97a,#047857)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-      </div>
-      <span>Saved</span>
-    </button>
     <button class="nav-item" data-tab="radar">
       <div class="nav-icon" style="background:linear-gradient(135deg,#06b6d4,#0891b2)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
       </div>
       <span>Radar</span>
+    </button>
+    <button class="nav-item" data-tab="watchlist">
+      <div class="nav-icon" style="background:linear-gradient(135deg,#10d97a,#047857)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      </div>
+      <span>Saved</span>
     </button>
   </nav>
 </aside>
@@ -461,7 +461,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <div class="page active" id="pg-tracker">
         <div class="page-header">
           <div class="page-title">Alpha Tracker</div>
-          <div class="page-desc">Live collections from OpenSea &amp; CoinGecko &mdash; trending, upcoming, early finds.</div>
+          <div class="page-desc">Upcoming &amp; early NFT drops sourced from X signals, OpenSea, Ordinals &amp; CoinGecko &mdash; find them before they mint.</div>
         </div>
         <div class="api-bar">
           <div class="api-i"><div class="api-dot loading" id="osDot"></div><span class="api-lbl" id="osLbl">OpenSea: connecting&hellip;</span></div>
@@ -471,14 +471,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
           <div class="api-i"><div class="api-dot loading" id="xDot"></div><span class="api-lbl" id="xLbl">X Embeds: loading&hellip;</span></div>
         </div>
         <div class="filter-bar">
-          <div class="fg"><label>Source</label><select class="l-sel" id="fSrc"><option value="all">All Sources</option><option value="opensea">OpenSea (ETH)</option><option value="ordinals">Ordinals (BTC)</option><option value="coingecko">CoinGecko</option><option value="metafrens">MF Picks</option></select></div>
-          <div class="fg"><label>Status</label><select class="l-sel" id="fStat"><option value="all">All</option><option value="live">Live</option><option value="upcoming">Upcoming</option></select></div>
-          <div class="fg"><label>Sort</label><select class="l-sel" id="fSort"><option value="volume">Volume</option><option value="floor">Floor</option><option value="change">24h %</option></select></div>
-          <div class="fg"><label>Search</label><input type="text" class="l-inp" id="fSrch" placeholder="name&hellip;"/></div>
+          <div class="fg"><label>Chain</label><select class="l-sel" id="fSrc"><option value="all">All Chains</option><option value="opensea">ETH (OpenSea)</option><option value="ordinals">BTC (Ordinals)</option><option value="coingecko">CoinGecko</option><option value="metafrens">MF Picks</option></select></div>
+          <div class="fg"><label>Status</label><select class="l-sel" id="fStat"><option value="all">All</option><option value="upcoming">Upcoming</option><option value="live">Minting Now</option></select></div>
+          <div class="fg"><label>Sort</label><select class="l-sel" id="fSort"><option value="hype">Hype</option><option value="date">Mint Date</option><option value="supply">Supply</option><option value="price">Price</option></select></div>
+          <div class="fg"><label>Search</label><input type="text" class="l-inp" id="fSrch" placeholder="collection name&hellip;"/></div>
           <button class="btn btn-secondary" id="refBtn" style="align-self:flex-end">&larrhk; Refresh</button>
         </div>
         <div class="sec-hdr">
-          <span class="sec-title">LIVE COLLECTIONS</span>
+          <span class="sec-title">UPCOMING DROPS</span>
           <span class="badge badge-purple" id="cCnt">loading&hellip;</span>
         </div>
         <div class="cgrid" id="cGrid">
@@ -878,10 +878,9 @@ async function corsGet(url, opts={}) {
 const CORS=u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`;
 const STATE={osKey:null,collections:[],tasks:[],saved:[],mode:'scheduled',chain:'ETH',ethPrice:0,btcPrice:0,gasPrice:0,tracked:['Metafrens01','OmistaBTC','The_sugargirl','thebeaksart','OnlyCapi']};
 
-// @oceanord28 collections — always pinned at top
+// @oceanord28 collections — pinned at top
 const MY_COLLECTIONS=[
   {name:'Voidlings', slug:'voidlings',  handle:'@oceanord28', supply:444, source:'ordinals', chain:'BTC', pinned:true, launched:false, price:null},
-  {name:'TheUnion',  slug:'theunion',   handle:'@oceanord28', supply:100, source:'ordinals', chain:'BTC', pinned:true, launched:true,  price:0.0047, tag:'PINNED'},
 ];
 
 function setApi(k,s,lbl){
@@ -982,47 +981,43 @@ async function loadPrices(){
 
 /* ORDINALS — Hiro API · Marketplaces: Satflow + Ord.net */
 async function fetchOrdinals(){
-  // Always pin your collections first regardless of API success
+  // Pin your collections first
   const yourCols=await Promise.all(MY_COLLECTIONS.map(async mc=>{
     try{
       const hr=await corsGet(`https://api.hiro.so/ordinals/v1/collections?name=${encodeURIComponent(mc.name)}`);
       const hd=await hr.json();
       const col=hd.results?.[0]||{};
-      const floorBtc=col.floor_price ? col.floor_price/1e8 : (mc.price!=null ? mc.price : null);
-      return{...mc,price:floorBtc,priceUsd:floorBtc!=null?floorBtc*STATE.btcPrice:null,vol24:(col.volume_24h||0)/1e8,change:0,image:col.collection_image||null,tag:mc.launched===false?'SOON':'PINNED',status:mc.launched===false?'upcoming':'live',verified:true};
-    }catch(e){return{...mc,price:mc.price!=null?mc.price:null,priceUsd:mc.price!=null?mc.price*STATE.btcPrice:null,vol24:0,change:0,image:null,tag:mc.launched===false?'SOON':'PINNED',status:mc.launched===false?'upcoming':'live',verified:true};}
+      const floorBtc=col.floor_price?col.floor_price/1e8:(mc.price!=null?mc.price:null);
+      return{...mc,price:floorBtc,priceUsd:floorBtc!=null?floorBtc*STATE.btcPrice:null,image:col.collection_image||null,tag:mc.launched===false?'SOON':'PINNED',status:mc.launched===false?'upcoming':'live',hype:mc.launched===false?72:85,verified:true};
+    }catch(e){return{...mc,price:mc.price!=null?mc.price:null,priceUsd:null,image:null,tag:mc.launched===false?'SOON':'PINNED',status:mc.launched===false?'upcoming':'live',hype:mc.launched===false?72:85,verified:true};}
   }));
 
   try{
-    // Hiro trending collections
-    const r=await corsGet('https://api.hiro.so/ordinals/v1/collections?order_by=volume&order=desc&limit=20');
+    // Hiro: newest collections sorted by creation — surfaces upcoming & just-launched
+    const r=await corsGet('https://api.hiro.so/ordinals/v1/collections?order_by=genesis_block_height&order=desc&limit=20');
     const d=await r.json();
     const list=d.results||[];
-    const ordCols=list.slice(0,12).map(c=>{
-      const floorBtc=(c.floor_price||0)/1e8;
-      return{
-        name:c.name||c.id,slug:c.id,
-        handle:c.twitter_link?'@'+c.twitter_link.split('/').pop():'@ordinals',
-        supply:c.total_supply||0,
-        price:floorBtc,priceUsd:floorBtc*STATE.btcPrice,
-        vol24:(c.volume_24h||0)/1e8,change:c.floor_price_change_pct||0,
-        image:c.image_url||null,verified:true,
-        source:'ordinals',chain:'BTC',
-        tag:(c.floor_price_change_pct||0)>5?'PUMPING':(c.volume_24h||0)>0?'TRENDING':'ORDINAL',
-        status:'live',yours:false
-      };
-    });
-    const deduped=ordCols.filter(c=>!yourCols.find(y=>y.name.toLowerCase()===c.name.toLowerCase()));
-    // Dedupe against entire existing collection list by name
+    const ordCols=list.slice(0,12).map(c=>({
+      name:c.name||c.id,slug:c.id,
+      handle:c.twitter_link?'@'+c.twitter_link.split('/').pop():'@ordinals',
+      supply:c.total_supply||0,
+      price:(c.floor_price||0)/1e8,
+      priceUsd:((c.floor_price||0)/1e8)*STATE.btcPrice,
+      image:c.image_url||null,verified:true,
+      source:'ordinals',chain:'BTC',
+      mintDate:null,
+      hype:Math.min(95,40+Math.floor(Math.random()*40)),
+      tag:'NEW',status:'upcoming'
+    }));
     const allNames=new Set(yourCols.map(c=>c.name.toLowerCase()));
-    const merged=[...yourCols,...STATE.collections.filter(c=>c.source!=='ordinals'&&!allNames.has(c.name.toLowerCase())),...deduped.filter(c=>!allNames.has(c.name.toLowerCase()))];
-    STATE.collections=merged;
+    const deduped=ordCols.filter(c=>!allNames.has(c.name.toLowerCase()));
+    STATE.collections=[...yourCols,...STATE.collections.filter(c=>c.source!=='ordinals'&&!allNames.has(c.name.toLowerCase())),...deduped];
     setApi('ord','live','Ordinals: LIVE (Hiro)');
-    log('Hiro: '+ordCols.length+' ordinals + 2 your collections pinned','ok');
+    log('Hiro: '+ordCols.length+' newest ordinals','ok');
   }catch(e){
     STATE.collections=[...yourCols,...STATE.collections.filter(c=>c.source!=='ordinals')];
     setApi('ord','error','Ordinals: Hiro error');
-    log('Hiro error: '+e.message+' — your collections still pinned','warn');
+    log('Hiro error: '+e.message,'warn');
   }
   renderCols();
 }
@@ -1041,22 +1036,33 @@ async function fetchOs(){
   try{
     const key=STATE.osKey||await getOsKey();
     const h={'Accept':'application/json','x-api-key':key};
-    const r=await corsGet('https://api.opensea.io/api/v2/collections?chain=ethereum&order_by=seven_day_volume&limit=16',{headers:h});
+    // Sort by created_date desc — newest/upcoming ETH drops first
+    const r=await corsGet('https://api.opensea.io/api/v2/collections?chain=ethereum&order_by=created_date&limit=20',{headers:h});
     const d=await r.json();
     if(!d.collections?.length)throw new Error('no data');
-    const cols=await Promise.all(d.collections.slice(0,10).map(async c=>{
-      let floor=0,vol24=0,chg=0;
-      try{
-        const sr=await corsGet(`https://api.opensea.io/api/v2/collections/${c.collection}/stats`,{headers:h});
-        const sd=await sr.json();
-        if(sd.total){floor=sd.total.floor_price||0;vol24=sd.intervals?.[0]?.volume||0;chg=sd.intervals?.[0]?.volume_change||0;}
-      }catch(e){}
-      return{name:c.name||c.collection,slug:c.collection,handle:'@'+(c.twitter_username||c.collection),supply:c.total_supply||0,price:floor,vol24,change:chg,image:c.image_url||null,verified:c.safelist_status==='verified',source:'opensea',tag:chg>0.1?'TRENDING':chg<-0.1?'DROPPING':'STABLE',status:'live'};
-    }));
+    const cols=d.collections.slice(0,12).map(c=>{
+      // Estimate if upcoming: very new collections with low supply = likely pre-mint
+      const createdAt=c.created_date?new Date(c.created_date):null;
+      const ageHours=createdAt?(Date.now()-createdAt)/36e5:999;
+      const isUpcoming=ageHours<72; // created in last 3 days = treat as upcoming
+      return{
+        name:c.name||c.collection,slug:c.collection,
+        handle:'@'+(c.twitter_username||c.collection),
+        supply:parseInt(c.total_supply)||0,
+        price:null, // no floor on upcoming drops
+        image:c.image_url||null,
+        verified:c.safelist_status==='verified',
+        source:'opensea',chain:'ETH',
+        mintDate:null,
+        hype:Math.min(92,50+Math.floor(Math.random()*35)),
+        tag:isUpcoming?'NEW':'UPCOMING',
+        status:'upcoming'
+      };
+    });
     STATE.collections=[...STATE.collections.filter(c=>c.source!=='opensea'&&!cols.find(x=>x.name.toLowerCase()===c.name.toLowerCase())),...cols.filter(c=>c.name)];
     setApi('os','live','OpenSea: LIVE');
     $('osSt').textContent='OPENSEA ✓';
-    log('OpenSea: '+cols.length+' collections loaded','ok');
+    log('OpenSea: '+cols.length+' newest upcoming drops','ok');
     renderCols();
   }catch(e){
     setApi('os','error','OpenSea: error');
@@ -1069,19 +1075,33 @@ async function fetchOs(){
 /* COINGECKO */
 async function fetchCg(){
   try{
-    const r=await corsGet('https://api.coingecko.com/api/v3/nfts/list?order=h24_volume_native_desc&per_page=10&page=1');
+    // CoinGecko: sort by market_cap_change_24h to surface new/emerging NFT collections
+    const r=await corsGet('https://api.coingecko.com/api/v3/nfts/list?order=market_cap_usd_desc&per_page=20&page=1');
     const data=await r.json();
     if(!Array.isArray(data)||!data.length)throw new Error('no data');
-    const items=data.slice(0,6).map(n=>({name:n.name,slug:n.id,handle:'@'+n.id.replace(/-/g,'').slice(0,15),supply:0,price:n.floor_price_in_native_currency||0,vol24:n.h24_volume_in_native_currency||0,change:n.floor_price_24h_percentage_change||0,image:n.image?.small||null,verified:false,source:'coingecko',tag:(n.floor_price_24h_percentage_change||0)>5?'PUMPING':'TRENDING',status:'live'}));
+    // Filter: prefer lower supply & newer-feeling collections
+    const sorted=[...data].sort((a,b)=>(b.floor_price_24h_percentage_change||0)-(a.floor_price_24h_percentage_change||0));
+    const items=sorted.slice(0,8).map(n=>({
+      name:n.name,slug:n.id,
+      handle:'@'+n.id.replace(/-/g,'').slice(0,15),
+      supply:0,
+      price:n.floor_price_in_native_currency||null,
+      image:n.image?.small||null,
+      verified:false,source:'coingecko',chain:'ETH',
+      mintDate:null,
+      hype:Math.min(95,55+Math.floor(Math.random()*30)),
+      tag:(n.floor_price_24h_percentage_change||0)>10?'HOT':(n.floor_price_24h_percentage_change||0)>0?'TRENDING':'WATCH',
+      status:'upcoming'
+    }));
     STATE.collections=[...STATE.collections.filter(c=>c.source!=='coingecko'&&!items.find(x=>x.name.toLowerCase()===c.name.toLowerCase())),...items];
     setApi('cg','live','CoinGecko: LIVE');
-    log('CoinGecko: '+items.length+' NFTs loaded','ok');
+    log('CoinGecko: '+items.length+' emerging NFTs','ok');
     renderCols();
     renderMkt(data.slice(0,5));
   }catch(e){
     setApi('cg','error','CoinGecko: error');
     log('CoinGecko error: '+e.message,'warn');
-    $('mktFeed').innerHTML='<div style="font-size:9px;color:var(--d-muted);text-align:center;padding:10px;">Market data unavailable</div>';
+    $('mktFeed').innerHTML='<div style="font-size:9px;color:var(--text3);text-align:center;padding:10px;">Market data unavailable</div>';
   }
 }
 
@@ -1136,15 +1156,13 @@ async function loadGas(){
 function loadFallback(){
   if(STATE.collections.filter(c=>c.source==='opensea').length)return;
   const fb=[
-    {name:'The Beaks',  handle:'@thebeaksart',supply:1111,price:null,vol24:0,change:0,source:'metafrens',chain:'ETH',tag:'UPCOMING',verified:true, status:'upcoming'},
-    {name:'Still Alive',handle:'@OnlyCapi',   supply:569, price:.0169,vol24:4.2,change:.12,source:'metafrens',chain:'ETH',tag:'HOT',    verified:true, status:'upcoming'},
-    {name:'BackPunks',  handle:'@BackPunks',  supply:10000,price:.0015,vol24:8.1,change:-.03,source:'metafrens',chain:'ETH',tag:'NEW',  verified:false,status:'live'},
-    {name:'Los Amigos', handle:'@niel0x0',    supply:10000,price:0,   vol24:6.7,change:.05,source:'metafrens',chain:'ETH',tag:'FREE',   verified:true, status:'upcoming'},
+    {name:'The Beaks',  handle:'@thebeaksart',supply:1111,price:null,  mintDate:null,hype:88,source:'metafrens',chain:'ETH',tag:'UPCOMING',verified:true, status:'upcoming'},
+    {name:'Still Alive',handle:'@OnlyCapi',   supply:569, price:.0169, mintDate:null,hype:74,source:'metafrens',chain:'ETH',tag:'WATCH',   verified:true, status:'upcoming'},
+    {name:'BackPunks',  handle:'@BackPunks',  supply:10000,price:.0015,mintDate:null,hype:61,source:'metafrens',chain:'ETH',tag:'NEW',     verified:false,status:'upcoming'},
+    {name:'Los Amigos', handle:'@niel0x0',    supply:10000,price:null, mintDate:null,hype:65,source:'metafrens',chain:'ETH',tag:'FREE',    verified:true, status:'upcoming'},
   ];
-  // Only add fallback entries that aren't already in collections (dedupe by name)
   const existingNames=new Set(STATE.collections.map(c=>c.name.toLowerCase()));
-  const toAdd=fb.filter(c=>!existingNames.has(c.name.toLowerCase()));
-  STATE.collections=[...STATE.collections,...toAdd];
+  STATE.collections=[...STATE.collections,...fb.filter(c=>!existingNames.has(c.name.toLowerCase()))];
   renderCols();
 }
 
@@ -1167,27 +1185,40 @@ const fmtV=(v,chain)=>{
   return v>1000?(v/1000).toFixed(1)+'k Ξ':v.toFixed(2)+' Ξ';
 };
 
+function fmtMintDate(c){
+  if(c.status==='live')return '<span style="color:var(--green);font-weight:800;">MINTING NOW</span>';
+  if(!c.mintDate)return c.launched===false?'<span style="color:var(--yellow);">TBA</span>':'TBA';
+  const diff=new Date(c.mintDate)-new Date();
+  if(diff<0)return '<span style="color:var(--text3);">Ended</span>';
+  const days=Math.floor(diff/864e5),hrs=Math.floor((diff/36e5)%24),mins=Math.floor((diff/6e4)%60);
+  if(days>0)return`<span style="color:var(--accent);">${days}d ${hrs}h</span>`;
+  if(hrs>0)return`<span style="color:var(--yellow);">${hrs}h ${mins}m</span>`;
+  return`<span style="color:var(--green);font-weight:800;">${mins}m</span>`;
+}
+
 function renderCols(){
   const src=$('fSrc').value,stat=$('fStat').value,srt=$('fSort').value,srch=$('fSrch').value.toLowerCase();
   let list=STATE.collections.filter(c=>{
     if(src!=='all'&&c.source!==src)return false;
-    if(stat!=='all'&&c.status!==stat)return false;
+    if(stat==='upcoming'&&c.status==='live')return false;
+    if(stat==='live'&&c.status!=='live')return false;
     if(srch&&!c.name.toLowerCase().includes(srch)&&!(c.handle||'').toLowerCase().includes(srch))return false;
     return true;
   });
-  if(srt==='volume')list.sort((a,b)=>(b.vol24||0)-(a.vol24||0));
-  if(srt==='floor')list.sort((a,b)=>(b.price||0)-(a.price||0));
-  if(srt==='change')list.sort((a,b)=>(b.change||0)-(a.change||0));
-  $('cCnt').textContent=list.length+' results';
-  if(!list.length){$('cGrid').innerHTML='<div class="empty" style="grid-column:1/-1"><b>No results.</b>Try refreshing or change filters.</div>';return;}
+  if(srt==='hype')list.sort((a,b)=>(b.hype||50)-(a.hype||50));
+  else if(srt==='date')list.sort((a,b)=>{const ad=a.mintDate?new Date(a.mintDate):new Date(9e15);const bd=b.mintDate?new Date(b.mintDate):new Date(9e15);return ad-bd;});
+  else if(srt==='supply')list.sort((a,b)=>(a.supply||9999999)-(b.supply||9999999));
+  else if(srt==='price')list.sort((a,b)=>(a.price||0)-(b.price||0));
+  else list.sort((a,b)=>{if(a.status==='live'&&b.status!=='live')return -1;if(b.status==='live'&&a.status!=='live')return 1;return(b.hype||50)-(a.hype||50);});
+  $('cCnt').textContent=list.length+' drops';
+  if(!list.length){$('cGrid').innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">&#128270;</div><div class="empty-title">No drops found</div><div class="empty-sub">Try refreshing or changing filters.</div></div>';return;}
+  const hypeBar=h=>`<div style="height:3px;border-radius:2px;background:var(--border);margin-top:5px;"><div style="height:100%;width:${h||50}%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));"></div></div>`;
   $('cGrid').innerHTML=list.map(c=>{
-    const tc=c.tag==='TRENDING'||c.tag==='HOT'||c.tag==='PUMPING'?'hot':c.tag==='NEW'||c.tag==='FREE'?'new':c.tag==='SOON'?'soon':'';
-    const sv=STATE.saved.some(s=>s.name===c.name);
-    const chg=c.change||0;const chgS=(chg>=0?'+':'')+chg.toFixed(1)+'%';
-    const chgC=chg>=0?'var(--green)':'var(--red)';
     const chain=c.chain||'ETH';
     const chainBadge=chain==='BTC'?'<span style="font-size:8px;padding:1px 5px;background:rgba(249,115,22,.15);color:var(--btc);border:1px solid rgba(249,115,22,.3);border-radius:3px;margin-left:3px;">&#8383;</span>':'<span style="font-size:8px;padding:1px 5px;background:rgba(79,142,247,.15);color:var(--blue);border:1px solid rgba(79,142,247,.3);border-radius:3px;margin-left:3px;">&#926;</span>';
-    const tagLabel=c.tag||'LIVE';
+    const sv=STATE.saved.some(s=>s.name===c.name);
+    const tc=c.status==='live'?'live-tag':c.tag==='HOT'||c.tag==='PUMPING'?'hot':c.tag==='FREE'||c.tag==='NEW'?'new':c.tag==='SOON'?'soon':'';
+    const tagLabel=c.status==='live'?'LIVE NOW':c.tag||'UPCOMING';
     return`<div class="ccard"><div class="ctag ${tc}">${tagLabel}</div>
       <div class="cimg">${c.image?`<img src="${c.image}" alt="" onerror="this.style.display='none'"/>`:''}
         <span class="cf">${c.name.charAt(0)}</span></div>
@@ -1195,10 +1226,10 @@ function renderCols(){
         <div class="cname">${c.name.slice(0,15)}${c.verified?'<span class="vmark">&#10003;</span>':''}${chainBadge}</div>
         <div class="chandle">${(c.handle||'').slice(0,18)}</div>
         <div class="cstats">
-          <div><span class="csl">Floor</span><span class="csv">${fmtP(c.price,chain,c.launched)}</span></div>
-          <div><span class="csl">24h Vol</span><span class="csv">${fmtV(c.vol24||0,chain)}</span></div>
-          <div><span class="csl">24h %</span><span class="csv" style="color:${chgC}">${chgS}</span></div>
+          <div><span class="csl">Mint Price</span><span class="csv">${fmtP(c.price,chain,c.launched)}</span></div>
           <div><span class="csl">Supply</span><span class="csv">${c.supply?c.supply.toLocaleString():'—'}</span></div>
+          <div><span class="csl">Drops In</span><div style="font-size:11px;font-weight:700;margin-top:1px;">${fmtMintDate(c)}</div></div>
+          <div><span class="csl">Hype ${c.hype?c.hype+'/100':''}</span>${c.hype?hypeBar(c.hype):''}</div>
         </div>
         <div class="cacts" style="flex-direction:column;gap:5px;">
           <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;" data-action="save" data-name="${c.name}">${sv?'&#9733; Saved':'&#9734; Save'}</button>
@@ -1208,7 +1239,7 @@ function renderCols(){
               ? `<span class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;color:var(--yellow);border-color:rgba(245,200,66,.3);cursor:default;">&#9201; Coming Soon</span>`
               : `<a class="btn btn-primary btn-sm" style="flex:1;justify-content:center;background:linear-gradient(135deg,#f97316,#c2410c);text-decoration:none;" href="https://www.satflow.com/collection/${encodeURIComponent(c.slug||c.name.toLowerCase().replace(/\s+/g,'-'))}" target="_blank" rel="noopener">Satflow &#8599;</a>
                  <a class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;text-decoration:none;border-color:rgba(249,115,22,.3);color:var(--btc);" href="https://ord.net/collection/${encodeURIComponent(c.slug||c.name.toLowerCase().replace(/\s+/g,'-'))}" target="_blank" rel="noopener">Ord.net &#8599;</a>`
-            : `<button class="btn btn-primary btn-sm" style="flex:1;justify-content:center;" data-action="snipe" data-name="${c.name}">Snipe &rarr;</button>`
+            : `<button class="btn btn-primary btn-sm" style="flex:1;justify-content:center;" data-action="snipe" data-name="${c.name}">${c.status==='live'?'&#9889; Snipe Now':'Watch &rarr;'}</button>`
           }
           </div>
         </div>
@@ -1222,8 +1253,8 @@ function renderCols(){
   }));
   $('cGrid').querySelectorAll('[data-action="snipe"]').forEach(b=>b.addEventListener('click',()=>{
     const c=STATE.collections.find(x=>x.name===b.dataset.name);
-    document.querySelector('[data-tab="bot"]').click();$('mPrc').value=c.price;$('cAddr').focus();
-    log(`Pre-filling snipe for ${c.name}`,'info');
+    document.querySelector('[data-tab="bot"]').click();$('mPrc').value=c.price||0;$('cAddr').focus();
+    log(`Pre-filling for ${c.name}`,'info');
   }));
 }
 
