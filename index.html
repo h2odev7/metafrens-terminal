@@ -7,297 +7,217 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#050507;
-  --s0:#08080c;--s1:#0c0c12;--s2:#111118;--s3:#16161f;
-  --b0:rgba(255,255,255,.04);--b1:rgba(255,255,255,.07);--b2:rgba(255,255,255,.12);
-  --hi:rgba(99,102,241,.3);
-  --acc:#6366f1;--acc2:#818cf8;--acc-glow:rgba(99,102,241,.12);
+  --bg:#000;
+  --s1:#0a0a0e;--s2:#0f0f14;--s3:#14141b;
+  --b0:rgba(168,85,247,.07);--b1:rgba(168,85,247,.13);--b2:rgba(168,85,247,.22);
+  --acc:#a855f7;--acc2:#c084fc;
   --ok:#22c55e;--err:#ef4444;--warn:#f59e0b;
-  --t0:#f1f5f9;--t1:#8892a4;--t2:#3d4559;
+  --t0:#f1f5f9;--t1:#7c8899;--t2:#3a4252;
   --fd:"Syne",sans-serif;--fm:"JetBrains Mono",monospace;
-  --rad:10px;--rad-sm:6px;
+  --r:8px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;background:var(--bg);color:var(--t0);font-family:var(--fm);font-size:13px;overflow:hidden;}
-::-webkit-scrollbar{width:2px;}::-webkit-scrollbar-thumb{background:var(--s3);}
+::-webkit-scrollbar{width:2px;}
+::-webkit-scrollbar-thumb{background:var(--s3);}
 
-/* APP SHELL */
 .app{display:grid;grid-template-rows:48px 1fr;height:100vh;}
 
-/* ─── TOPBAR ─── */
+/* TOPBAR */
 .topbar{
   display:flex;align-items:center;justify-content:space-between;
-  padding:0 28px;
-  background:var(--s0);
+  padding:0 32px;background:var(--bg);
   border-bottom:1px solid var(--b0);
-  position:relative;
 }
-.topbar::after{
-  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(99,102,241,.4),transparent);
-}
-.brand{display:flex;align-items:center;gap:10px;}
-.pulse{width:5px;height:5px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulse 2.5s infinite;}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.8)}}
-.wordmark{
-  font-family:var(--fd);font-size:14px;font-weight:800;letter-spacing:.04em;
-  background:linear-gradient(100deg,#fff 30%,var(--acc2) 60%,#fff 90%);
-  background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  animation:shimmer 5s linear infinite;
-}
-@keyframes shimmer{0%{background-position:200%}100%{background-position:-200%}}
-.topbar-right{display:flex;align-items:center;gap:24px;}
-.stat{display:flex;flex-direction:column;align-items:flex-end;gap:0px;}
-.stat-l{font-size:8px;color:var(--t2);letter-spacing:.1em;text-transform:uppercase;}
-.stat-v{font-size:12px;font-weight:600;color:var(--t0);transition:color .3s;}
-.stat-v.up{color:var(--ok);}
-.stat-v.down{color:var(--err);}
-.clk{font-size:10px;color:var(--t2);letter-spacing:.06em;padding-left:20px;border-left:1px solid var(--b1);}
+.brand{display:flex;align-items:center;gap:9px;}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--ok);box-shadow:0 0 7px var(--ok);animation:p 2.5s infinite;}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+.wm{font-family:var(--fd);font-size:14px;font-weight:800;letter-spacing:.05em;
+  background:linear-gradient(90deg,#fff 20%,var(--acc) 55%,var(--acc2) 70%,#fff 90%);
+  background-size:250%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:sw 5s linear infinite;}
+@keyframes sw{0%{background-position:200%}100%{background-position:-200%}}
+.tb-r{display:flex;align-items:center;gap:22px;}
+.stat{display:flex;flex-direction:column;align-items:flex-end;}
+.sl{font-size:7.5px;color:var(--t2);letter-spacing:.12em;text-transform:uppercase;}
+.sv{font-size:12px;font-weight:600;transition:color .3s;}
+.sv.up{color:var(--ok);}
+.sv.down{color:var(--err);}
+#clk{font-size:10px;color:var(--t2);letter-spacing:.05em;padding-left:18px;border-left:1px solid var(--b1);}
 
-/* ─── MAIN ─── */
-.main{display:grid;grid-template-columns:320px 1fr;height:100%;overflow:hidden;}
+/* BODY — single scrollable column */
+.body{overflow-y:auto;height:100%;padding:36px 32px 40px;}
 
-/* ─── FORM PANEL ─── */
-.form-panel{
-  background:var(--s0);border-right:1px solid var(--b0);
-  overflow-y:auto;padding:22px 20px;
-  display:flex;flex-direction:column;gap:0;
-}
-.form-section{margin-bottom:20px;}
-.form-label{
-  font-size:8px;font-weight:700;color:var(--t2);letter-spacing:.14em;text-transform:uppercase;
-  margin-bottom:5px;display:block;
-}
+/* dividers between sections */
+.div{height:1px;background:var(--b0);margin:32px 0;}
+
+/* FIELD LABEL */
+.lbl{display:block;font-size:8px;font-weight:700;color:var(--t2);
+  letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px;}
+
+/* SECTION HEADING — subtle, not boxed */
+.sh{font-family:var(--fd);font-size:10px;font-weight:700;color:var(--t2);
+  letter-spacing:.12em;text-transform:uppercase;margin-bottom:20px;
+  display:flex;align-items:center;gap:10px;}
+.sh::after{content:'';flex:1;height:1px;background:var(--b0);}
+
+/* INPUTS */
 input,select{
-  width:100%;background:var(--s1);border:1px solid var(--b1);color:var(--t0);
-  padding:9px 11px;font-family:var(--fm);font-size:12px;
-  border-radius:var(--rad-sm);outline:none;transition:border-color .15s,background .15s;
+  width:100%;background:var(--s1);border:1px solid var(--b0);color:var(--t0);
+  padding:10px 12px;font-family:var(--fm);font-size:12.5px;
+  border-radius:var(--r);outline:none;transition:border-color .15s,background .15s;
 }
 input:focus,select:focus{border-color:var(--acc);background:var(--s2);}
 input::placeholder{color:var(--t2);}
-.hint{font-size:9px;color:var(--t2);margin-top:4px;line-height:1.5;}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.note{font-size:9px;color:var(--t2);margin-top:4px;line-height:1.5;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.field{margin-bottom:14px;}
 
-/* MODE SELECTOR */
-.modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border:1px solid var(--b1);border-radius:var(--rad-sm);overflow:hidden;}
-.mode{
-  padding:8px 2px;background:none;border:none;border-right:1px solid var(--b1);
+/* MODE TABS */
+.mtabs{display:grid;grid-template-columns:1fr 1fr 1fr;border:1px solid var(--b1);border-radius:var(--r);overflow:hidden;}
+.mtab{padding:9px;background:none;border:none;border-right:1px solid var(--b1);
   color:var(--t1);font-family:var(--fm);font-size:9.5px;font-weight:600;
-  cursor:pointer;text-align:center;letter-spacing:.05em;transition:all .15s;
-}
-.mode:last-child{border-right:none;}
-.mode.on{background:var(--acc);color:#fff;letter-spacing:.06em;}
-.mode-note{font-size:9px;color:var(--t2);margin-top:5px;line-height:1.5;}
+  cursor:pointer;text-align:center;letter-spacing:.05em;transition:all .15s;}
+.mtab:last-child{border-right:none;}
+.mtab.on{background:var(--acc);color:#fff;}
+.mnote{font-size:9px;color:var(--t2);margin-top:6px;}
 
-/* ADD BUTTON */
-.add-btn{
-  width:100%;padding:12px;margin-top:4px;
-  background:linear-gradient(135deg,var(--acc) 0%,#4f46e5 100%);
-  color:#fff;border:none;border-radius:var(--rad-sm);
-  font-family:var(--fd);font-size:13px;font-weight:700;letter-spacing:.03em;
-  cursor:pointer;transition:all .2s;position:relative;overflow:hidden;
+/* PRIMARY BUTTON */
+.btn-p{
+  width:100%;padding:12px;
+  background:linear-gradient(135deg,var(--acc),#7c3aed);
+  color:#fff;border:none;border-radius:var(--r);
+  font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.03em;
+  cursor:pointer;transition:all .2s;
 }
-.add-btn::before{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(135deg,rgba(255,255,255,.08),transparent);
-  opacity:0;transition:opacity .2s;
-}
-.add-btn:hover::before{opacity:1;}
-.add-btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(99,102,241,.35);}
-.add-btn:active{transform:translateY(0);}
+.btn-p:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(168,85,247,.35);}
 
 /* LOG */
-.log{
-  background:var(--bg);border:1px solid var(--b0);border-radius:var(--rad-sm);
-  padding:10px 12px;height:100px;overflow-y:auto;
-  font-size:9.5px;margin-top:14px;
-}
+.log{background:var(--s1);border:1px solid var(--b0);border-radius:var(--r);
+  padding:10px 13px;max-height:90px;overflow-y:auto;font-size:9.5px;margin-top:16px;}
 .le{padding:1.5px 0;color:var(--t2);}
-.le .ts{color:var(--s3);margin-right:7px;}
+.le .ts{color:var(--t2);opacity:.4;margin-right:7px;}
 .le.ok{color:var(--ok);}
 .le.err{color:var(--err);}
 .le.warn{color:var(--warn);}
 .le.info{color:var(--acc2);}
 
-/* ─── RIGHT PANEL ─── */
-.right{display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
+/* TASK CARDS */
+.task-count{font-size:9px;font-weight:600;letter-spacing:.07em;
+  padding:3px 9px;border-radius:20px;
+  background:transparent;border:1px solid var(--b1);color:var(--t2);}
+.tc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.tc-header-title{font-family:var(--fd);font-size:11px;font-weight:700;color:var(--t1);letter-spacing:.08em;text-transform:uppercase;}
 
-/* TASKS */
-.tasks-wrap{flex:1;overflow-y:auto;padding:24px 28px 16px;}
-.section-head{
-  display:flex;align-items:center;justify-content:space-between;
-  margin-bottom:18px;
-}
-.section-head-title{
-  font-family:var(--fd);font-size:13px;font-weight:800;
-  color:var(--t0);letter-spacing:-.01em;
-}
-.task-count{
-  font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
-  padding:3px 10px;border-radius:20px;
-  background:var(--s1);border:1px solid var(--b1);color:var(--t2);
-}
+.empty{text-align:center;padding:36px 0;color:var(--t2);}
+.empty-ico{font-size:28px;opacity:.08;margin-bottom:8px;}
+.empty-h{font-size:12px;font-weight:600;color:var(--t2);}
+.empty-p{font-size:10.5px;color:var(--t2);opacity:.6;margin-top:3px;}
 
-/* EMPTY STATE */
-.empty{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:64px 20px;gap:10px;
+.tcard{
+  border-left:2px solid var(--b1);
+  padding:14px 16px;margin-bottom:12px;
+  transition:border-color .15s;
 }
-.empty-glyph{
-  font-size:36px;opacity:.06;
-  filter:grayscale(1);
-  margin-bottom:4px;
-}
-.empty-h{font-size:13px;font-weight:600;color:var(--t1);}
-.empty-p{font-size:11px;color:var(--t2);text-align:center;max-width:240px;line-height:1.6;}
-
-/* TASK CARD */
-.task-card{
-  background:var(--s0);border:1px solid var(--b0);
-  border-radius:var(--rad);padding:16px;margin-bottom:10px;
-  transition:border-color .15s,transform .15s;
-  position:relative;overflow:hidden;
-}
-.task-card::before{
-  content:'';position:absolute;left:0;top:0;bottom:0;width:2px;
-  background:var(--t2);border-radius:2px 0 0 2px;
-}
-.task-card.waiting::before{background:var(--warn);}
-.task-card.ready::before{background:var(--ok);}
-.task-card.watching::before{background:var(--acc2);}
-.task-card:hover{border-color:var(--b1);transform:translateX(2px);}
-.tc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;}
-.tc-addr{font-size:11.5px;font-weight:600;color:var(--t0);}
-.tc-sub{font-size:9px;color:var(--t2);margin-top:2px;}
-.tc-badge{
-  font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
-  padding:3px 8px;border-radius:20px;flex-shrink:0;
-}
+.tcard.waiting{border-color:var(--warn);}
+.tcard.ready{border-color:var(--ok);}
+.tcard.watching{border-color:var(--acc);}
+.tc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;}
+.tc-addr{font-size:12px;font-weight:600;color:var(--t0);}
+.tc-from{font-size:9px;color:var(--t2);margin-top:2px;}
+.tc-badge{font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 8px;border-radius:20px;flex-shrink:0;}
 .tc-badge.waiting{background:rgba(245,158,11,.1);color:var(--warn);border:1px solid rgba(245,158,11,.2);}
 .tc-badge.ready{background:rgba(34,197,94,.1);color:var(--ok);border:1px solid rgba(34,197,94,.2);}
-.tc-badge.watching{background:rgba(99,102,241,.1);color:var(--acc2);border:1px solid rgba(99,102,241,.2);}
-.tc-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
-.tc-m{display:flex;flex-direction:column;gap:2px;}
-.tc-ml{font-size:8px;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;}
-.tc-mv{font-size:11.5px;font-weight:600;color:var(--t0);}
-.tc-mv.hi{color:var(--acc2);}
-.tc-actions{display:flex;gap:6px;}
-.tc-btn{
-  padding:6px 12px;border-radius:var(--rad-sm);
-  font-family:var(--fm);font-size:10px;font-weight:600;
-  cursor:pointer;transition:all .15s;border:1px solid var(--b1);
-}
-.tc-btn.fire{background:rgba(34,197,94,.12);color:var(--ok);border-color:rgba(34,197,94,.25);}
-.tc-btn.fire:hover{background:rgba(34,197,94,.2);}
-.tc-btn.prev{background:var(--s1);color:var(--t1);border-color:var(--b1);}
-.tc-btn.prev:hover{color:var(--t0);}
-.tc-btn.del{background:none;color:var(--t2);border-color:transparent;}
-.tc-btn.del:hover{color:var(--err);border-color:rgba(239,68,68,.2);}
+.tc-badge.watching{background:rgba(168,85,247,.1);color:var(--acc2);border:1px solid rgba(168,85,247,.2);}
+.tc-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;}
+.tcml{font-size:8px;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:2px;}
+.tcmv{font-size:11.5px;font-weight:600;color:var(--t0);}
+.tcmv.hi{color:var(--acc2);}
+.tc-acts{display:flex;gap:6px;}
+.tbtn{padding:5px 11px;border-radius:var(--r);font-family:var(--fm);font-size:10px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid transparent;}
+.tbtn.fire{background:rgba(34,197,94,.1);color:var(--ok);border-color:rgba(34,197,94,.2);}
+.tbtn.fire:hover{background:rgba(34,197,94,.18);}
+.tbtn.prev{background:var(--s1);color:var(--t1);border-color:var(--b0);}
+.tbtn.prev:hover{color:var(--t0);}
+.tbtn.del{color:var(--t2);}
+.tbtn.del:hover{color:var(--err);}
 
-/* ─── MINT DIRECT (bottom strip) ─── */
-.mint-direct{
-  background:var(--s0);border-top:1px solid var(--b0);
-  padding:18px 28px;flex-shrink:0;
+/* MINT DIRECT */
+.md-row{display:flex;gap:8px;margin-bottom:6px;}
+.md-in{
+  flex:1;background:var(--s1);border:1px solid var(--b0);color:var(--t0);
+  padding:11px 14px;font-family:var(--fm);font-size:13px;
+  border-radius:var(--r);outline:none;transition:border-color .15s;
 }
-.md-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.md-heading{
-  font-family:var(--fd);font-size:12px;font-weight:800;color:var(--t0);
-  display:flex;align-items:center;gap:8px;letter-spacing:.01em;
-}
-.md-heading .bolt{
-  width:20px;height:20px;border-radius:5px;
-  background:var(--acc-glow);border:1px solid rgba(99,102,241,.25);
-  display:grid;place-items:center;font-size:10px;
-}
-.md-sub{font-size:9.5px;color:var(--t2);}
-.md-row{display:flex;gap:8px;}
-.md-input{
-  flex:1;background:var(--s1);border:1px solid var(--b1);color:var(--t0);
-  padding:10px 14px;font-family:var(--fm);font-size:12.5px;
-  border-radius:var(--rad-sm);outline:none;transition:border-color .15s;
-}
-.md-input:focus{border-color:var(--acc);}
-.md-input::placeholder{color:var(--t2);}
+.md-in:focus{border-color:var(--acc);}
+.md-in::placeholder{color:var(--t2);}
 .md-fetch{
-  padding:10px 18px;background:var(--acc);color:#fff;border:none;
-  border-radius:var(--rad-sm);font-family:var(--fm);font-size:11px;font-weight:700;
-  cursor:pointer;letter-spacing:.04em;transition:all .15s;white-space:nowrap;
+  padding:11px 20px;background:var(--acc);color:#fff;border:none;
+  border-radius:var(--r);font-family:var(--fm);font-size:11px;font-weight:700;
+  cursor:pointer;white-space:nowrap;transition:all .15s;letter-spacing:.04em;
 }
 .md-fetch:hover{background:var(--acc2);transform:translateY(-1px);}
-
-.md-result{display:none;margin-top:14px;}
-.md-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
-.md-card{background:var(--s1);border:1px solid var(--b0);border-radius:var(--rad-sm);padding:10px 12px;}
-.md-card-l{font-size:8px;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:3px;}
-.md-card-v{font-size:12.5px;font-weight:600;color:var(--t0);}
+.md-hint{font-size:9px;color:var(--t2);}
+.md-result{display:none;margin-top:16px;}
+.md-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
+.mdc .mdcl{font-size:8px;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px;}
+.mdc .mdcv{font-size:12.5px;font-weight:600;color:var(--t0);}
 .md-btns{display:flex;gap:8px;}
 .md-mint{
   flex:1;padding:11px;
-  background:linear-gradient(135deg,var(--acc),#4f46e5);
-  color:#fff;border:none;border-radius:var(--rad-sm);
-  font-family:var(--fd);font-size:12px;font-weight:800;
-  cursor:pointer;letter-spacing:.02em;
-  transition:all .2s;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,var(--acc),#7c3aed);
+  color:#fff;border:none;border-radius:var(--r);
+  font-family:var(--fd);font-size:12px;font-weight:800;letter-spacing:.03em;
+  cursor:pointer;transition:all .2s;
 }
-.md-mint:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(99,102,241,.4);}
-.md-queue{
-  padding:11px 20px;background:var(--s2);color:var(--t1);
-  border:1px solid var(--b1);border-radius:var(--rad-sm);
+.md-mint:hover{transform:translateY(-1px);box-shadow:0 5px 18px rgba(168,85,247,.35);}
+.md-q{
+  padding:11px 18px;background:transparent;color:var(--t1);
+  border:1px solid var(--b1);border-radius:var(--r);
   font-family:var(--fm);font-size:11px;font-weight:600;
   cursor:pointer;transition:all .15s;white-space:nowrap;
 }
-.md-queue:hover{color:var(--t0);border-color:var(--acc);}
-.md-status{font-size:10px;color:var(--t2);margin-top:8px;display:none;}
-.md-status.ok{color:var(--ok);}
-.md-status.err{color:var(--err);}
+.md-q:hover{color:var(--t0);border-color:var(--acc);}
+.md-st{font-size:10px;margin-top:8px;display:none;color:var(--t2);}
+.md-st.ok{color:var(--ok);}
+.md-st.err{color:var(--err);}
 
-/* ─── WALLET MODAL ─── */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);backdrop-filter:blur(8px);display:none;place-items:center;z-index:200;}
-.overlay.open{display:grid;}
+/* WALLET MODAL */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.9);backdrop-filter:blur(8px);display:none;place-items:center;z-index:200;}
+.ov.open{display:grid;}
 .modal{
-  background:var(--s0);border:1px solid var(--b1);
-  border-radius:14px;padding:28px;width:420px;max-width:95vw;
-  box-shadow:0 32px 80px rgba(0,0,0,.8),0 0 0 1px var(--b0);
-  position:relative;
+  background:var(--s1);border:1px solid var(--b1);
+  border-radius:12px;padding:28px;width:420px;max-width:95vw;
+  box-shadow:0 24px 80px rgba(0,0,0,.8);
 }
-.modal::before{
-  content:'';position:absolute;top:-1px;left:20%;right:20%;height:1px;
-  background:linear-gradient(90deg,transparent,var(--acc2),transparent);
-}
-.modal-close{
-  position:absolute;top:16px;right:16px;
-  background:var(--s2);border:1px solid var(--b1);color:var(--t1);
-  width:26px;height:26px;border-radius:6px;font-size:14px;
-  cursor:pointer;display:grid;place-items:center;transition:all .15s;
-}
-.modal-close:hover{color:var(--t0);border-color:var(--b2);}
 .modal h2{font-family:var(--fd);font-size:16px;font-weight:800;margin-bottom:4px;}
 .modal p{font-size:11px;color:var(--t1);margin-bottom:16px;line-height:1.6;}
-.tx-box{
-  background:var(--bg);border:1px solid var(--b0);border-radius:var(--rad-sm);
-  padding:13px;margin-bottom:16px;
-}
-.tx-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--b0);}
-.tx-row:last-child{border:none;padding-bottom:0;}
-.tx-k{font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:.07em;}
-.tx-v{font-size:11px;color:var(--t0);font-weight:500;max-width:60%;overflow:hidden;text-overflow:ellipsis;text-align:right;}
-.wallets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
-.w-btn{
-  padding:12px;background:var(--s1);border:1px solid var(--b1);
-  border-radius:var(--rad-sm);color:var(--t0);font-family:var(--fm);
-  font-size:11px;font-weight:600;cursor:pointer;text-align:center;
-  text-decoration:none;display:block;transition:all .15s;
-}
-.w-btn:hover{border-color:var(--b2);background:var(--s2);}
-.w-btn.mm{border-color:rgba(245,130,32,.3);color:#f58220;}
-.w-btn.rb{border-color:rgba(99,102,241,.3);color:var(--acc2);}
-.w-btn.copy{color:var(--t2);}
-.modal-footer{font-size:9px;color:var(--t2);line-height:1.6;border-top:1px solid var(--b0);padding-top:12px;}
+.mcls{position:absolute;top:18px;right:18px;background:none;border:none;color:var(--t2);font-size:16px;cursor:pointer;padding:4px;}
+.modal{position:relative;}
+.txbox{background:var(--bg);border:1px solid var(--b0);border-radius:var(--r);padding:13px;margin-bottom:16px;}
+.txr{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--b0);}
+.txr:last-child{border:none;}
+.txk{font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;}
+.txv{font-size:11px;color:var(--t0);font-weight:500;text-align:right;max-width:60%;overflow:hidden;text-overflow:ellipsis;}
+.wgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.wb{padding:12px;background:var(--s2);border:1px solid var(--b0);border-radius:var(--r);
+  color:var(--t0);font-family:var(--fm);font-size:11px;font-weight:600;
+  cursor:pointer;text-align:center;text-decoration:none;display:block;transition:all .15s;}
+.wb:hover{border-color:var(--b2);background:var(--s3);}
+.wb.mm{border-color:rgba(245,130,32,.25);color:#f58220;}
+.wb.rb{border-color:rgba(168,85,247,.25);color:var(--acc2);}
+.mfoot{font-size:9px;color:var(--t2);line-height:1.6;border-top:1px solid var(--b0);padding-top:12px;}
 
-@media(max-width:800px){
-  .main{grid-template-columns:1fr;}
-  .form-panel{display:none;}
-  .md-cards{grid-template-columns:1fr 1fr;}
+@keyframes flashUp{0%{background:rgba(34,197,94,.15)}100%{background:transparent}}
+@keyframes flashDown{0%{background:rgba(239,68,68,.15)}100%{background:transparent}}
+
+@media(max-width:640px){
+  .body{padding:20px 18px 32px;}
+  .g2,.g3{grid-template-columns:1fr;}
+  .md-grid{grid-template-columns:1fr 1fr;}
+  .tc-meta{grid-template-columns:1fr 1fr;}
 }
 </style>
 </head>
@@ -307,150 +227,132 @@ input::placeholder{color:var(--t2);}
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="brand">
-    <div class="pulse"></div>
-    <span class="wordmark">METABOT</span>
+    <div class="dot"></div>
+    <span class="wm">METABOT</span>
   </div>
-  <div class="topbar-right">
-    <div class="stat">
-      <span class="stat-l">ETH</span>
-      <span class="stat-v" id="ethP">$—</span>
-    </div>
-    <div class="stat">
-      <span class="stat-l">GWEI</span>
-      <span class="stat-v" id="gasP">—</span>
-    </div>
-    <span class="clk" id="clk">--:--:--</span>
+  <div class="tb-r">
+    <div class="stat"><span class="sl">ETH</span><span class="sv" id="ethP">$—</span></div>
+    <div class="stat"><span class="sl">GWEI</span><span class="sv" id="gasP">—</span></div>
+    <span id="clk">--:--:--</span>
   </div>
 </div>
 
-<!-- MAIN -->
-<div class="main">
+<!-- BODY -->
+<div class="body">
 
-  <!-- LEFT: FORM -->
-  <div class="form-panel">
+  <!-- WALLET + CONTRACT -->
+  <div class="field">
+    <span class="lbl">Wallet Address</span>
+    <input type="text" id="uAddr" placeholder="0x…"/>
+    <p class="note">Address only — keys never requested</p>
+  </div>
 
-    <div class="form-section">
-      <span class="form-label">Wallet Address</span>
-      <input type="text" id="uAddr" placeholder="0x…"/>
-      <p class="hint">Address only — keys never requested</p>
-    </div>
-
-    <div class="form-section">
-      <span class="form-label">Contract Address</span>
+  <div class="g2" style="margin-bottom:14px;">
+    <div class="field" style="margin:0;">
+      <span class="lbl">Contract Address</span>
       <input type="text" id="cAddr" placeholder="0x…"/>
     </div>
-
-    <div class="form-section">
-      <span class="form-label">Mint Function</span>
+    <div class="field" style="margin:0;">
+      <span class="lbl">Mint Function</span>
       <input type="text" id="mFn" value="mint(uint256)"/>
-      <p class="hint">Common: mint(uint256) · publicMint(uint256) · claim()</p>
     </div>
+  </div>
 
-    <div class="form-section row2">
-      <div>
-        <span class="form-label">Quantity</span>
-        <input type="number" id="mQty" value="1" min="1"/>
-      </div>
-      <div>
-        <span class="form-label">Price (ETH)</span>
-        <input type="number" id="mPrc" value="0" step="0.0001"/>
-      </div>
+  <div class="g3" style="margin-bottom:14px;">
+    <div class="field" style="margin:0;">
+      <span class="lbl">Quantity</span>
+      <input type="number" id="mQty" value="1" min="1"/>
     </div>
-
-    <div class="form-section">
-      <span class="form-label">Bot Mode</span>
-      <div class="modes" id="modeBar">
-        <button class="mode on" data-mode="scheduled">SCHED</button>
-        <button class="mode" data-mode="sniper">SNIPER</button>
-        <button class="mode" data-mode="manual">MANUAL</button>
-      </div>
-      <p class="mode-note" id="mNote">Fires wallet deep-link at the scheduled time</p>
+    <div class="field" style="margin:0;">
+      <span class="lbl">Price (ETH)</span>
+      <input type="number" id="mPrc" value="0" step="0.0001"/>
     </div>
+    <div class="field" style="margin:0;">
+      <span class="lbl">Max Gas (gwei)</span>
+      <input type="number" id="mGas" value="50"/>
+    </div>
+  </div>
 
-    <div class="form-section" id="schFld">
-      <span class="form-label">Mint Time (Local)</span>
+  <div class="g2" style="margin-bottom:14px;">
+    <div class="field" style="margin:0;">
+      <span class="lbl">Priority Tip (gwei)</span>
+      <input type="number" id="mTip" value="2" step="0.1"/>
+    </div>
+    <div class="field" style="margin:0;">
+      <span class="lbl">Mint Time</span>
       <input type="datetime-local" id="mTime"/>
     </div>
+  </div>
 
-    <div class="form-section row2">
-      <div>
-        <span class="form-label">Max Gas (gwei)</span>
-        <input type="number" id="mGas" value="50"/>
-      </div>
-      <div>
-        <span class="form-label">Priority Tip</span>
-        <input type="number" id="mTip" value="2" step="0.1"/>
-      </div>
+  <div class="field">
+    <span class="lbl">Bot Mode</span>
+    <div class="mtabs" id="modeBar">
+      <button class="mtab on" data-mode="scheduled">SCHED</button>
+      <button class="mtab" data-mode="sniper">SNIPER</button>
+      <button class="mtab" data-mode="manual">MANUAL</button>
     </div>
+    <p class="mnote" id="mNote">Fires wallet deep-link at the scheduled time</p>
+  </div>
 
-    <button class="add-btn" id="addTask">+ Add to Queue</button>
+  <button class="btn-p" id="addTask">+ Add to Queue</button>
 
-    <div class="log" id="botLog">
-      <div class="le info"><span class="ts">[boot]</span>METABOT ready — ETH mint terminal. No keys. You sign.</div>
+  <div class="log" id="botLog">
+    <div class="le info"><span class="ts">[--:--:--]</span>METABOT ready — ETH mint terminal. No keys. You sign.</div>
+  </div>
+
+  <!-- DIVIDER -->
+  <div class="div"></div>
+
+  <!-- TASK QUEUE -->
+  <div class="tc-header">
+    <span class="tc-header-title">Task Queue</span>
+    <span class="task-count" id="tskCnt">0 tasks</span>
+  </div>
+  <div id="actTasks">
+    <div class="empty">
+      <div class="empty-ico">⚡</div>
+      <div class="empty-h">No tasks queued</div>
+      <div class="empty-p">Add a task above, or paste a mint link below.</div>
     </div>
   </div>
 
-  <!-- RIGHT -->
-  <div class="right">
+  <!-- DIVIDER -->
+  <div class="div"></div>
 
-    <!-- TASKS -->
-    <div class="tasks-wrap">
-      <div class="section-head">
-        <span class="section-head-title">Task Queue</span>
-        <span class="task-count" id="tskCnt">0 tasks</span>
-      </div>
-      <div id="actTasks">
-        <div class="empty">
-          <div class="empty-glyph">⚡</div>
-          <div class="empty-h">Queue is empty</div>
-          <div class="empty-p">Add a task from the form, or paste a mint link below and fire instantly.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- MINT DIRECT -->
-    <div class="mint-direct">
-      <div class="md-top">
-        <div class="md-heading">
-          <div class="bolt">⚡</div>
-          Mint Direct
-        </div>
-        <span class="md-sub">Paste any ETH mint link or contract address</span>
-      </div>
-
-      <div class="md-row">
-        <input type="text" id="mdUrl" class="md-input" placeholder="opensea.io/collection/… · zora.co/collect/… · 0x contract · mint.fun/0x…"/>
-        <button class="md-fetch" id="mdFetch">Resolve →</button>
-      </div>
-
-      <div class="md-result" id="mdResult">
-        <div class="md-cards" id="mdMeta"></div>
-        <div class="md-btns">
-          <button class="md-mint" id="mdMintNow">⚡ Mint Now</button>
-          <button class="md-queue" id="mdQueue">+ Add to Queue</button>
-        </div>
-      </div>
-      <div class="md-status" id="mdStatus"></div>
-    </div>
-
+  <!-- MINT DIRECT -->
+  <div class="sh">Mint Direct</div>
+  <div class="md-row">
+    <input type="text" id="mdUrl" class="md-in" placeholder="Paste any ETH mint link or 0x contract…"/>
+    <button class="md-fetch" id="mdFetch">🔍 Fetch</button>
   </div>
-</div>
-</div>
+  <p class="md-hint">opensea.io · zora.co · mint.fun · foundation.app · manifold.xyz · coinbase NFT · 0x contract</p>
+
+  <div class="md-result" id="mdResult">
+    <div class="md-grid" id="mdMeta"></div>
+    <div class="md-btns">
+      <button class="md-mint" id="mdMintNow">⚡ Mint Now</button>
+      <button class="md-q" id="mdQueue">+ Add to Queue</button>
+    </div>
+  </div>
+  <div class="md-st" id="mdStatus"></div>
+
+</div><!-- /body -->
+</div><!-- /app -->
 
 <!-- WALLET MODAL -->
-<div class="overlay" id="overlay">
+<div class="ov" id="overlay">
   <div class="modal">
-    <button class="modal-close" id="mdClose">✕</button>
-    <h2>Ready to Mint</h2>
-    <p>Transaction pre-built. Open your wallet and sign — keys never leave your device.</p>
-    <div class="tx-box" id="txPrev"></div>
-    <div class="wallets" id="wallets">
-      <a class="w-btn mm" id="mmL" target="_blank" rel="noopener">MetaMask</a>
-      <a class="w-btn rb" id="rbL" target="_blank" rel="noopener">Rainbow</a>
-      <a class="w-btn" id="twL" target="_blank" rel="noopener">Trust Wallet</a>
-      <button class="w-btn copy" id="cpyTx">Copy TX Data</button>
+    <button class="mcls" id="mdClose">✕</button>
+    <h2>Ready to Mint ⚡</h2>
+    <p>Transaction pre-built. Open your wallet, review and sign. Keys never leave your device.</p>
+    <div class="txbox" id="txPrev"></div>
+    <div class="wgrid">
+      <a class="wb mm" id="mmL" target="_blank" rel="noopener">MetaMask</a>
+      <a class="wb rb" id="rbL" target="_blank" rel="noopener">Rainbow</a>
+      <a class="wb" id="twL" target="_blank" rel="noopener">Trust Wallet</a>
+      <button class="wb" id="cpyTx">Copy TX Data</button>
     </div>
-    <div class="modal-footer">Bot pre-builds calldata only. You review and sign in your own wallet. No private key ever shared.</div>
+    <div class="mfoot">Bot pre-builds calldata only. You review and sign in your own wallet.</div>
   </div>
 </div>
 
@@ -458,132 +360,113 @@ input::placeholder{color:var(--t2);}
 'use strict';
 const $=id=>document.getElementById(id);
 const STATE={tasks:[],mode:'scheduled',ethPrice:0,gasPrice:0};
-const CACHE_KEY='mb_prices';
 
-/* ── PRICES ── */
-let _prevEth=0;
+/* PRICES */
+let _prev=0;
 async function loadPrices(){
-  try{const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');if(c.eth)_setEth(c.eth);}catch(e){}
+  try{const c=JSON.parse(localStorage.getItem('mb_p')||'{}');if(c.eth)_setEth(c.eth);}catch(e){}
   try{
     const r=await Promise.race([fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'),new Promise((_,rej)=>setTimeout(rej,5e3))]);
-    const d=await r.json();
-    const p=d.ethereum.usd;_setEth(p);STATE.ethPrice=p;localStorage.setItem(CACHE_KEY,JSON.stringify({eth:p}));
+    const d=await r.json();const p=d.ethereum.usd;
+    _setEth(p);STATE.ethPrice=p;localStorage.setItem('mb_p',JSON.stringify({eth:p}));
   }catch(e){
     try{const r=await fetch('https://api.coincap.io/v2/assets/ethereum');const d=await r.json();_setEth(parseFloat(d.data.priceUsd));}catch(e2){}
   }
 }
 function _setEth(p){
   const el=$('ethP');if(!el||!p)return;
-  const up=p>_prevEth,down=p<_prevEth;
+  const up=p>_prev,down=p<_prev;
   el.textContent='$'+p.toLocaleString('en-US',{maximumFractionDigits:0});
-  if(_prevEth){
-    el.className='stat-v '+(up?'up':'down');
-    el.parentElement.style.animation='none';el.parentElement.offsetHeight;
+  if(_prev&&p!==_prev){
+    el.className='sv '+(up?'up':'down');
+    el.parentElement.style.animation='none';void el.parentElement.offsetHeight;
     el.parentElement.style.animation=(up?'flashUp':'flashDown')+' .6s ease';
-    setTimeout(()=>{el.className='stat-v';el.parentElement.style.animation='';},700);
+    setTimeout(()=>{el.className='sv';el.parentElement.style.animation='';},700);
   }
-  _prevEth=p;STATE.ethPrice=p;
+  _prev=p;STATE.ethPrice=p;
 }
 async function loadGas(){
   try{
-    const r=await fetch('https://ethereum.publicnode.com',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({jsonrpc:'2.0',method:'eth_gasPrice',params:[],id:1})});
+    const r=await fetch('https://ethereum.publicnode.com',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'eth_gasPrice',params:[],id:1})});
     const d=await r.json();
-    if(d.result){const g=Math.round(parseInt(d.result,16)/1e9);STATE.gasPrice=g;$('gasP').textContent=g+' gwei';}
+    if(d.result){const g=Math.round(parseInt(d.result,16)/1e9);STATE.gasPrice=g;$('gasP').textContent=g;}
   }catch(e){}
 }
 
-/* ── CLOCK ── */
+/* CLOCK */
 function tick(){$('clk').textContent=new Date().toLocaleTimeString('en-US',{hour12:false});}
 
-/* ── LOG ── */
+/* LOG */
 function log(msg,t=''){
   const d=document.createElement('div');d.className='le '+(t||'');
   d.innerHTML=`<span class="ts">[${new Date().toLocaleTimeString('en-US',{hour12:false})}]</span>${msg}`;
-  $('botLog').insertBefore(d,$('botLog').firstChild);
-  while($('botLog').children.length>80)$('botLog').removeChild($('botLog').lastChild);
+  const l=$('botLog');l.insertBefore(d,l.firstChild);
+  while(l.children.length>60)l.removeChild(l.lastChild);
 }
 
-/* ── MODES ── */
-document.querySelectorAll('#modeBar .mode').forEach(b=>b.addEventListener('click',()=>{
-  document.querySelectorAll('#modeBar .mode').forEach(x=>x.classList.remove('on'));
+/* MODES */
+document.querySelectorAll('#modeBar .mtab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#modeBar .mtab').forEach(x=>x.classList.remove('on'));
   b.classList.add('on');STATE.mode=b.dataset.mode;
-  const notes={
-    scheduled:'Fires wallet deep-link at the scheduled time',
-    sniper:'Polls contract every 10s — fires the instant mint goes live',
-    manual:'Queued — hit ⚡ Fire anytime to open your wallet instantly'
-  };
-  $('mNote').textContent=notes[STATE.mode];
-  $('schFld').style.display=STATE.mode==='scheduled'?'block':'none';
+  const n={scheduled:'Fires wallet deep-link at the scheduled time',sniper:'Polls contract every 10s — fires the instant mint goes live',manual:'Queued — hit ⚡ Fire anytime to open your wallet'};
+  $('mNote').textContent=n[STATE.mode];
 }));
 
-/* ── CALLDATA ── */
+/* CALLDATA */
 function kH(s){let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=(h*0x01000193)>>>0;}return h.toString(16).padStart(8,'0');}
 
-/* ── ADD TASK ── */
+/* ADD TASK */
 $('addTask').addEventListener('click',()=>{
-  const addr=$('uAddr').value.trim(),contract=$('cAddr').value.trim();
+  const addr=$('uAddr').value.trim(),c=$('cAddr').value.trim();
   if(!addr.match(/^0x[a-fA-F0-9]{40}$/)){log('Invalid wallet address','err');return;}
-  if(!contract.match(/^0x[a-fA-F0-9]{40}$/)){log('Invalid contract address','err');return;}
-  const task={
-    id:Date.now(),addr,contract,
-    fn:$('mFn').value.trim()||'mint(uint256)',
-    qty:parseInt($('mQty').value)||1,
-    price:parseFloat($('mPrc').value)||0,
-    maxGas:parseInt($('mGas').value)||50,
-    tip:parseFloat($('mTip').value)||2,
-    mode:STATE.mode,
-    time:STATE.mode==='scheduled'?new Date($('mTime').value):null,
-    status:STATE.mode==='manual'?'ready':'waiting'
-  };
-  STATE.tasks.unshift(task);
-  renderTasks();
-  log(`[${STATE.mode.toUpperCase()}] Queued: ${contract.slice(0,10)}… ×${task.qty} @ ${task.price}Ξ`,'ok');
+  if(!c.match(/^0x[a-fA-F0-9]{40}$/)){log('Invalid contract address','err');return;}
+  const t={id:Date.now(),addr,contract:c,fn:$('mFn').value.trim()||'mint(uint256)',
+    qty:parseInt($('mQty').value)||1,price:parseFloat($('mPrc').value)||0,
+    maxGas:parseInt($('mGas').value)||50,tip:parseFloat($('mTip').value)||2,
+    mode:STATE.mode,time:STATE.mode==='scheduled'?new Date($('mTime').value):null,
+    status:STATE.mode==='manual'?'ready':'waiting'};
+  STATE.tasks.unshift(t);renderTasks();
+  log(`[${STATE.mode.toUpperCase()}] Queued: ${c.slice(0,10)}… ×${t.qty} @ ${t.price}Ξ`,'ok');
 });
 
-/* ── RENDER TASKS ── */
-function fmtCountdown(t){
-  const d=new Date(t)-new Date();if(d<=0)return'NOW';
-  const h=Math.floor(d/36e5),m=Math.floor((d/6e4)%60),s=Math.floor((d/1e3)%60);
-  return h>0?`${h}h ${m}m`:`${m}m ${s}s`;
-}
+/* RENDER TASKS */
+function fmtCD(t){const d=new Date(t)-new Date();if(d<=0)return'NOW';const h=Math.floor(d/36e5),m=Math.floor((d/6e4)%60),s=Math.floor((d/1e3)%60);return h>0?`${h}h ${m}m`:`${m}m ${s}s`;}
+
 function renderTasks(){
   $('tskCnt').textContent=STATE.tasks.length+' task'+(STATE.tasks.length!==1?'s':'');
   const el=$('actTasks');
   if(!STATE.tasks.length){
-    el.innerHTML='<div class="empty"><div class="empty-glyph">⚡</div><div class="empty-h">Queue is empty</div><div class="empty-p">Add a task from the form, or paste a mint link below and fire instantly.</div></div>';
+    el.innerHTML='<div class="empty"><div class="empty-ico">⚡</div><div class="empty-h">No tasks queued</div><div class="empty-p">Add a task above, or paste a mint link below.</div></div>';
     return;
   }
   el.innerHTML=STATE.tasks.map(t=>`
-    <div class="task-card ${t.status}">
+    <div class="tcard ${t.status}">
       <div class="tc-top">
-        <div>
-          <div class="tc-addr">${t.contract.slice(0,12)}…${t.contract.slice(-4)}</div>
-          <div class="tc-sub">FROM ${t.addr.slice(0,10)}…${t.addr.slice(-4)} · ${t.mode.toUpperCase()}</div>
-        </div>
+        <div><div class="tc-addr">${t.contract.slice(0,12)}…${t.contract.slice(-4)}</div>
+          <div class="tc-from">FROM ${t.addr.slice(0,10)}…${t.addr.slice(-4)} · ${t.mode.toUpperCase()}</div></div>
         <span class="tc-badge ${t.status}">${t.status.toUpperCase()}</span>
       </div>
       <div class="tc-meta">
-        <div class="tc-m"><span class="tc-ml">Function</span><span class="tc-mv">${t.fn.slice(0,13)}</span></div>
-        <div class="tc-m"><span class="tc-ml">Qty</span><span class="tc-mv">${t.qty}</span></div>
-        <div class="tc-m"><span class="tc-ml">Price</span><span class="tc-mv">${t.price}Ξ</span></div>
-        <div class="tc-m"><span class="tc-ml">${t.mode==='scheduled'?'Fires In':'State'}</span><span class="tc-mv hi">${t.time?fmtCountdown(t.time):t.mode==='sniper'?'WATCHING':'ON DEMAND'}</span></div>
+        <div><span class="tcml">Function</span><span class="tcmv">${t.fn.slice(0,13)}</span></div>
+        <div><span class="tcml">Qty</span><span class="tcmv">${t.qty}</span></div>
+        <div><span class="tcml">Price</span><span class="tcmv">${t.price}Ξ</span></div>
+        <div><span class="tcml">${t.mode==='scheduled'?'Fires In':'State'}</span><span class="tcmv hi">${t.time?fmtCD(t.time):t.mode==='sniper'?'WATCHING':'ON DEMAND'}</span></div>
       </div>
-      <div class="tc-actions">
-        <button class="tc-btn fire" data-id="${t.id}" data-act="fire">⚡ Fire</button>
-        <button class="tc-btn prev" data-id="${t.id}" data-act="prev">Preview</button>
-        <button class="tc-btn del" data-id="${t.id}" data-act="del">✕</button>
+      <div class="tc-acts">
+        <button class="tbtn fire" data-id="${t.id}" data-a="fire">⚡ Fire</button>
+        <button class="tbtn prev" data-id="${t.id}" data-a="prev">Preview</button>
+        <button class="tbtn del" data-id="${t.id}" data-a="del">✕</button>
       </div>
     </div>`).join('');
-  el.querySelectorAll('.tc-btn').forEach(b=>b.addEventListener('click',()=>{
+  el.querySelectorAll('.tbtn').forEach(b=>b.addEventListener('click',()=>{
     const t=STATE.tasks.find(x=>x.id==b.dataset.id);if(!t)return;
-    if(b.dataset.act==='fire'){t.status='ready';openModal(t);renderTasks();}
-    if(b.dataset.act==='prev')openModal(t);
-    if(b.dataset.act==='del'){STATE.tasks=STATE.tasks.filter(x=>x.id!=b.dataset.id);renderTasks();log('Task cancelled','warn');}
+    if(b.dataset.a==='fire'){t.status='ready';openModal(t);renderTasks();}
+    if(b.dataset.a==='prev')openModal(t);
+    if(b.dataset.a==='del'){STATE.tasks=STATE.tasks.filter(x=>x.id!=b.dataset.id);renderTasks();log('Task cancelled','warn');}
   }));
 }
 
-/* ── SNIPER TICK ── */
+/* SNIPER */
 function tickTasks(){
   STATE.tasks.forEach(t=>{
     if(t.mode==='scheduled'&&t.time&&t.status==='waiting'&&new Date()>=t.time){
@@ -598,8 +481,7 @@ function tickTasks(){
           .then(r=>r.json()).then(d=>{
             if(d.result&&d.result!=='0x'&&!d.error){
               t.status='ready';log('⚡ SNIPER HIT: '+t.contract.slice(0,12)+'… LIVE','ok');openModal(t);
-            }else t.status='waiting';
-            renderTasks();
+            }else t.status='waiting';renderTasks();
           }).catch(()=>{t.status='waiting';});
       }
     }
@@ -607,7 +489,7 @@ function tickTasks(){
   renderTasks();
 }
 
-/* ── MODAL ── */
+/* MODAL */
 function openModal(t){
   const tot=t.price*t.qty;
   const data='0x'+kH(t.fn)+BigInt(t.qty).toString(16).padStart(64,'0');
@@ -616,25 +498,20 @@ function openModal(t){
     ['From',t.addr.slice(0,14)+'…'+t.addr.slice(-4)],
     ['To',t.contract.slice(0,14)+'…'+t.contract.slice(-4)],
     ['Function',t.fn],
-    ['Qty / Value',t.qty+' × '+t.price+'Ξ = '+tot.toFixed(4)+'Ξ'+(STATE.ethPrice?' ($'+(tot*STATE.ethPrice).toFixed(2)+')':'')],
-    ['Gas Limit',t.maxGas+' gwei max · '+t.tip+' gwei tip'],
-  ].map(([k,v])=>`<div class="tx-row"><span class="tx-k">${k}</span><span class="tx-v">${v}</span></div>`).join('');
+    ['Qty / Value',`${t.qty} × ${t.price}Ξ = ${tot.toFixed(4)}Ξ${STATE.ethPrice?' ($'+(tot*STATE.ethPrice).toFixed(2)+')':''}`],
+    ['Gas',`${t.maxGas} gwei max · ${t.tip} gwei tip`],
+  ].map(([k,v])=>`<div class="txr"><span class="txk">${k}</span><span class="txv">${v}</span></div>`).join('');
   $('mmL').href=`https://metamask.app.link/send/${t.contract}@1?value=${vW}&data=${data}`;
   $('rbL').href=`https://rnbwapp.com/wc?uri=${encodeURIComponent('ethereum:'+t.contract+'@1?value='+vW+'&data='+data)}`;
   $('twL').href=`trust://send?address=${t.contract}&amount=${tot}&coin=60&data=${data}`;
-  $('cpyTx').onclick=()=>{
-    navigator.clipboard.writeText(JSON.stringify({from:t.addr,to:t.contract,value:'0x'+vW.toString(16),data},null,2));
-    $('cpyTx').textContent='✓ Copied';setTimeout(()=>$('cpyTx').textContent='Copy TX Data',2e3);
-  };
-  $('overlay').classList.add('open');
-  log('Wallet deep-link ready','info');
+  $('cpyTx').onclick=()=>{navigator.clipboard.writeText(JSON.stringify({from:t.addr,to:t.contract,value:'0x'+vW.toString(16),data},null,2));$('cpyTx').textContent='✓ Copied';setTimeout(()=>$('cpyTx').textContent='Copy TX Data',2e3);};
+  $('overlay').classList.add('open');log('Wallet deep-link ready','info');
 }
 $('mdClose').onclick=()=>$('overlay').classList.remove('open');
 $('overlay').onclick=e=>{if(e.target.id==='overlay')$('overlay').classList.remove('open');};
 
-/* ── MINT DIRECT ── */
-const MD={contract:null,price:0,name:'',slug:''};
-
+/* MINT DIRECT */
+const MD={contract:null,price:0,name:''};
 function parseUrl(raw){
   raw=raw.trim();
   if(raw.match(/^0x[a-fA-F0-9]{40}$/))return{type:'contract',value:raw,platform:'direct'};
@@ -648,91 +525,54 @@ function parseUrl(raw){
     [/manifold\.gallery\/collection\/([^/?#]+)/,'manifold','slug'],
     [/nft\.coinbase\.com\/collection\/ethereum\/(0x[a-fA-F0-9]{40})/,'coinbase','contract'],
     [/rarible\.com\/collection\/(0x[a-fA-F0-9]{40})/,'rarible','contract'],
-    [/superrare\.com\/token\/(0x[a-fA-F0-9]{40})/,'superrare','contract'],
   ];
   for(const[re,platform,type]of maps){const m=raw.match(re);if(m)return{type,value:m[1],platform};}
   if(raw.length>3&&!raw.includes(' '))return{type:'slug',value:raw,platform:'opensea'};
   return null;
 }
-
-function mdMsg(msg,type=''){
-  const el=$('mdStatus');el.style.display='block';
-  el.className='md-status'+(type?' '+type:'');el.textContent=msg;
-}
+function mdSt(msg,t=''){const el=$('mdStatus');el.style.display='block';el.className='md-st'+(t?' '+t:'');el.textContent=msg;}
 
 $('mdFetch').addEventListener('click',async()=>{
   const raw=$('mdUrl').value.trim();
-  if(!raw){mdMsg('Paste a mint link or 0x contract address.','err');return;}
+  if(!raw){mdSt('Paste a mint link or 0x address.','err');return;}
   const parsed=parseUrl(raw);
-  if(!parsed){mdMsg('Unrecognised URL — try the 0x contract address directly.','err');return;}
-  mdMsg('Resolving…');$('mdResult').style.display='none';
-
+  if(!parsed){mdSt('Unrecognised — try pasting the 0x contract address.','err');return;}
+  mdSt('Fetching…');$('mdResult').style.display='none';
   try{
     let contract=null,name='',floor=0,supply='—';
-
     if(parsed.type==='contract'){
       contract=parsed.value;
-      // Fetch name() from contract
       try{
-        const r=await fetch('https://ethereum.publicnode.com',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data:'0x06fdde03'},'latest'],id:1})});
+        const r=await fetch('https://ethereum.publicnode.com',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data:'0x06fdde03'},'latest'],id:1})});
         const d=await r.json();
-        if(d.result&&d.result.length>66){
-          const hex=d.result.slice(130).replace(/^0+/,'');
-          name=hex.match(/../g)?.map(b=>String.fromCharCode(parseInt(b,16))).join('').replace(/\x00/g,'').trim()||'';
-        }
+        if(d.result&&d.result.length>66){const hex=d.result.slice(130);name=hex.match(/../g)?.map(b=>String.fromCharCode(parseInt(b,16))).join('').replace(/\x00/g,'').trim()||'';}
       }catch(e){}
       if(!name)name='Contract '+contract.slice(0,8)+'…';
-    } else {
-      // Slug — try OpenSea
-      const proxyPrefixes=[
-        'https://corsproxy.io/?url=',
-        'https://api.allorigins.win/raw?url=',
-      ];
-      const osUrl='https://api.opensea.io/api/v2/collections/'+parsed.value;
-      let colData=null;
-      for(const px of proxyPrefixes){
+    }else{
+      for(const px of['https://corsproxy.io/?url=','https://api.allorigins.win/raw?url=']){
         try{
-          const r=await fetch(px+encodeURIComponent(osUrl),{headers:{Accept:'application/json'}});
-          const d=await r.json();if(d&&!d.errors){colData=d;break;}
+          const r=await fetch(px+encodeURIComponent('https://api.opensea.io/api/v2/collections/'+parsed.value),{headers:{Accept:'application/json'}});
+          const d=await r.json();
+          if(d&&!d.errors){contract=d.contracts?.[0]?.address||null;name=d.name||parsed.value;supply=d.total_supply?parseInt(d.total_supply).toLocaleString():'—';
+            try{const sr=await fetch(px+encodeURIComponent('https://api.opensea.io/api/v2/collections/'+d.collection+'/stats'),{headers:{Accept:'application/json'}});const sd=await sr.json();floor=sd.total?.floor_price||0;}catch(e){}
+            break;}
         }catch(e){}
       }
-      if(colData){
-        contract=colData.contracts?.[0]?.address||null;
-        name=colData.name||parsed.value;
-        supply=colData.total_supply?parseInt(colData.total_supply).toLocaleString():'—';
-        // stats
-        try{
-          const sr=await fetch('https://corsproxy.io/?url='+encodeURIComponent('https://api.opensea.io/api/v2/collections/'+colData.collection+'/stats'),{headers:{Accept:'application/json'}});
-          const sd=await sr.json();floor=sd.total?.floor_price||0;
-        }catch(e){}
-      }
-      if(!contract&&parsed.platform==='mintfun')contract=parsed.value;
     }
-
-    if(!contract?.match(/^0x[a-fA-F0-9]{40}$/)){
-      mdMsg('Could not resolve contract — paste the 0x address directly.','err');return;
-    }
-
+    if(!contract?.match(/^0x[a-fA-F0-9]{40}$/)){mdSt('Could not resolve contract — paste 0x address directly.','err');return;}
     MD.contract=contract;MD.price=floor;MD.name=name;
-
-    $('mdMeta').innerHTML=[
-      ['Collection',name.slice(0,22)||'—'],
-      ['Contract',contract.slice(0,10)+'…'+contract.slice(-4)],
-      ['Floor',floor>0?floor.toFixed(4)+' Ξ':'—'],
-      ['Supply',supply],
-    ].map(([l,v])=>`<div class="md-card"><span class="md-card-l">${l}</span><span class="md-card-v">${v}</span></div>`).join('');
-
+    $('mdMeta').innerHTML=[['Collection',name.slice(0,22)||'—'],['Contract',contract.slice(0,10)+'…'+contract.slice(-4)],['Floor',floor>0?floor.toFixed(4)+' Ξ':'—'],['Supply',supply]]
+      .map(([l,v])=>`<div class="mdc"><span class="mdcl">${l}</span><span class="mdcv">${v}</span></div>`).join('');
     $('mdResult').style.display='block';
-    mdMsg('✓ Resolved — set qty/gas in the form, then mint.','ok');
-    log(`Mint Direct: ${name} (${contract.slice(0,10)}…) via ${parsed.platform}`,'ok');
-  }catch(e){mdMsg('Error: '+e.message,'err');log('Mint Direct error: '+e.message,'err');}
+    mdSt('✓ Resolved — review details and mint.','ok');
+    log('Mint Direct: '+name+' ('+contract.slice(0,10)+'…) via '+parsed.platform,'ok');
+  }catch(e){mdSt('Error: '+e.message,'err');}
 });
 
 $('mdMintNow').addEventListener('click',()=>{
   const addr=$('uAddr').value.trim();
-  if(!addr.match(/^0x[a-fA-F0-9]{40}$/)){mdMsg('Enter your wallet address in the form first.','err');return;}
-  if(!MD.contract){mdMsg('Resolve a contract first.','err');return;}
+  if(!addr.match(/^0x[a-fA-F0-9]{40}$/)){mdSt('Enter your wallet address above first.','err');return;}
+  if(!MD.contract){mdSt('Fetch a contract first.','err');return;}
   const t={id:Date.now(),addr,contract:MD.contract,fn:'mint(uint256)',
     qty:parseInt($('mQty').value)||1,price:MD.price||parseFloat($('mPrc').value)||0,
     maxGas:parseInt($('mGas').value)||50,tip:parseFloat($('mTip').value)||2,
@@ -742,15 +582,14 @@ $('mdMintNow').addEventListener('click',()=>{
 
 $('mdQueue').addEventListener('click',()=>{
   const addr=$('uAddr').value.trim();
-  if(!addr.match(/^0x[a-fA-F0-9]{40}$/)){mdMsg('Enter your wallet address in the form first.','err');return;}
-  if(!MD.contract){mdMsg('Resolve a contract first.','err');return;}
-  $('cAddr').value=MD.contract;
-  $('mPrc').value=MD.price||0;
-  mdMsg('✓ Pre-filled — set mode and hit Add to Queue.','ok');
+  if(!addr.match(/^0x[a-fA-F0-9]{40}$/)){mdSt('Enter your wallet address above first.','err');return;}
+  if(!MD.contract){mdSt('Fetch a contract first.','err');return;}
+  $('cAddr').value=MD.contract;$('mPrc').value=MD.price||0;
+  mdSt('✓ Pre-filled — set mode and add to queue.','ok');
   log('Pre-filled form for '+MD.name,'info');
 });
 
-/* ── INIT ── */
+/* INIT */
 async function init(){
   tick();setInterval(tick,1e3);setInterval(tickTasks,1e3);
   setInterval(loadPrices,30e3);setInterval(loadGas,30e3);
