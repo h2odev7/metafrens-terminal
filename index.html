@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>METAFRENS // ALPHA TERMINAL</title>
+<title>METABOT // MINT TERMINAL</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -22,18 +22,24 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--surface4);border-radius:4px;}
 
-.app{display:flex;height:100vh;}
-.sidebar{width:72px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;position:relative;z-index:10;}
-.sidebar::after{content:'';position:absolute;top:0;right:-1px;width:1px;height:100%;background:linear-gradient(to bottom,transparent,rgba(168,85,247,.25),transparent);}
-.main-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.app{display:flex;flex-direction:column;height:100vh;}
+.main-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
 
-.logo{padding:16px 6px 14px;border-bottom:1px solid var(--border);width:100%;display:flex;justify-content:center;}
-.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),#7c3aed);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:var(--glow-sm);}
-.nav{flex:1;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;}
-.nav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:10px 4px;border-radius:var(--radius-sm);cursor:pointer;font-size:9px;font-weight:600;color:var(--text2);transition:all .18s;width:58px;text-align:center;border:none;background:none;}
+/* BOTTOM NAV */
+.bottom-nav{
+  display:flex;flex-direction:row;align-items:center;justify-content:center;
+  gap:6px;padding:8px 16px;
+  background:var(--surface);border-top:1px solid var(--border);
+  flex-shrink:0;z-index:10;
+  box-shadow:0 -4px 24px rgba(0,0,0,.3);
+}
+.bottom-nav::before{content:'';position:absolute;bottom:100%;left:0;right:0;height:1px;background:linear-gradient(to right,transparent,rgba(168,85,247,.3),transparent);}
+.bottom-nav{position:relative;}
+
+.nav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 18px;border-radius:var(--radius-sm);cursor:pointer;font-size:9px;font-weight:600;color:var(--text2);transition:all .18s;text-align:center;border:none;background:none;min-width:64px;}
 .nav-item:hover{background:var(--surface2);color:var(--text);}
 .nav-item.active{background:var(--surface2);color:var(--accent);}
-.nav-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:all .18s;}
+.nav-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:all .18s;}
 .nav-item.active .nav-icon{box-shadow:0 4px 14px rgba(168,85,247,.4);}
 
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:13px 26px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;}
@@ -51,7 +57,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 @keyframes priceFlashDown{0%{background:rgba(240,69,69,.25);}100%{background:transparent;}}
 #clk{font-size:11.5px;color:var(--text2);font-variant-numeric:tabular-nums;}
 
-.content-area{display:flex;flex:1;overflow:hidden;}
+.content-area{display:flex;flex:1;overflow:hidden;min-height:0;}
 
 /* LEFT PANEL */
 .left-panel{width:290px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:20px 16px;}
@@ -238,29 +244,22 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   .left-panel{display:none;}
   .bot-layout{grid-template-columns:1fr;}
   .cgrid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}
-
-  /* TOPBAR — stack brand + prices vertically, compact */
   .topbar{padding:10px 14px;flex-wrap:wrap;gap:6px;}
   .topbar-left{gap:8px;flex:1;min-width:0;}
   .page-label{font-size:13px;}
   .page-sublabel{font-size:10px;}
   .topbar-right{gap:0;flex-shrink:0;}
-
-  /* Prices in a single horizontal row on mobile */
   .stat-pill{flex-direction:row;align-items:center;gap:4px;padding:4px 8px;background:var(--surface2);border-radius:20px;border:1px solid var(--border);}
   .stat-pill .sl{font-size:8px;color:var(--text3);letter-spacing:.04em;}
   .stat-pill .sv{font-size:11px;font-weight:700;}
-  .stat-pill .sv span{font-size:9px;}
-
-  /* Hide % change label on mobile — too cramped */
   .stat-pill .sv span:last-child{display:none;}
-
   #clk{display:none;}
   .live-dot{width:6px;height:6px;}
-
-  /* Pages */
   .page{padding:16px 14px;}
   .page-title{font-size:20px;}
+  .bottom-nav{gap:2px;padding:6px 8px;}
+  .nav-item{min-width:52px;padding:6px 10px;font-size:8px;}
+  .nav-icon{width:24px;height:24px;}
 }
 
 /* ── COLLABS ── */
@@ -311,11 +310,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   .stat-pill{padding:3px 6px;}
   .stat-pill .sl{font-size:7px;}
   .stat-pill .sv{font-size:10px;}
-  .sidebar{width:52px;}
-  .nav-item{width:44px;}
-  .nav-item span{font-size:8px;}
-  .nav-icon{width:26px;height:26px;}
   .page{padding:12px 10px;}
+  .nav-item{min-width:44px;padding:5px 6px;font-size:8px;}
+  .nav-icon{width:22px;height:22px;}
 }
 /* ── RADAR ── */
 .radar-grid{display:grid;grid-template-columns:340px 1fr;gap:18px;}
@@ -357,53 +354,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 <body>
 <div class="app">
 
-<!-- SIDEBAR -->
-<aside class="sidebar">
-  <div class="logo">
-    <div class="logo-icon">&#10024;</div>
-  </div>
-  <nav class="nav">
-    <button class="nav-item active" data-tab="tracker">
-      <div class="nav-icon" style="background:linear-gradient(135deg,#a855f7,#7c3aed)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      </div>
-      <span>Alpha</span>
-    </button>
-    <button class="nav-item" data-tab="bot">
-      <div class="nav-icon" style="background:#0a0a0a;border:1px solid rgba(255,255,255,0.15);">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      </div>
-      <span>Bot</span>
-    </button>
-    <button class="nav-item" data-tab="collabs">
-      <div class="nav-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      </div>
-      <span>Collabs</span>
-    </button>
-    <button class="nav-item" data-tab="radar">
-      <div class="nav-icon" style="background:linear-gradient(135deg,#06b6d4,#0891b2)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
-      </div>
-      <span>Radar</span>
-    </button>
-    <button class="nav-item" data-tab="watchlist">
-      <div class="nav-icon" style="background:linear-gradient(135deg,#10d97a,#047857)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-      </div>
-      <span>Saved</span>
-    </button>
-  </nav>
-</aside>
-
 <div class="main-wrap">
   <!-- TOPBAR -->
   <div class="topbar">
     <div class="topbar-left">
       <div class="live-dot"></div>
       <div>
-        <div class="page-label">METAFRENS</div>
-        <div class="page-sublabel" style="color:var(--accent);font-weight:600;">Alpha Terminal</div>
+        <div class="page-label">METABOT</div>
+        <div class="page-sublabel" style="color:var(--accent);font-weight:600;">Mint Terminal</div>
       </div>
     </div>
     <div class="topbar-right">
@@ -411,6 +369,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         <div class="stat-pill"><span class="sl">BTC</span><span class="sv" id="btcP">$&mdash;</span></div>
         <div class="stat-pill"><span class="sl">ETH</span><span class="sv" id="ethP">$&mdash;</span></div>
         <div class="stat-pill"><span class="sl">SOL</span><span class="sv" id="solP">$&mdash;</span></div>
+        <div class="stat-pill"><span class="sl">GWEI</span><span class="sv" id="gasP">&mdash;</span></div>
       </div>
       <div id="clk" style="margin-left:16px;">--:--:--</div>
     </div>
@@ -420,29 +379,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <!-- LEFT PANEL -->
     <div class="left-panel">
       <div class="hero">
-        <h1>Alpha lives where<br><em>frens</em> hunt.</h1>
-        <p>Live from OpenSea, CoinGecko &amp; X. Real signals, no demos.</p>
+        <h1>Mint smarter.<br><em>frens</em> go first.</h1>
+        <p>Live upcoming drops from OpenSea, Ordinals &amp; CoinGecko. Spot early, mint fast.</p>
         <div class="hbadges">
-          <span class="hb on">@METAFRENS01</span>
           <span class="hb on" id="osSt">OPENSEA</span>
-          <span class="hb on" id="xSt">X LIVE</span>
+          <span class="hb on">ORDINALS</span>
           <span class="hb">NO KEYS</span>
-        </div>
-      </div>
-
-      <div class="panel-sec">
-        <div class="panel-sec-title">X Signal Feed <span class="cnt">LIVE</span></div>
-        <div id="twFeed"><div class="tw-loading">Connecting to X&hellip;</div></div>
-      </div>
-
-      <div class="pdiv"></div>
-
-      <div class="panel-sec">
-        <div class="panel-sec-title">Tracked Accounts <span class="cnt" id="trcCnt">0</span></div>
-        <div id="trcList"></div>
-        <div class="add-row">
-          <input type="text" class="add-inp" id="newHandle" placeholder="@handle"/>
-          <button class="btn btn-primary btn-sm" id="addH">+ Track</button>
         </div>
       </div>
 
@@ -460,8 +402,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <!-- TRACKER -->
       <div class="page active" id="pg-tracker">
         <div class="page-header">
-          <div class="page-title">Alpha Tracker</div>
-          <div class="page-desc">Upcoming &amp; early NFT drops sourced from X signals, OpenSea, Ordinals &amp; CoinGecko &mdash; find them before they mint.</div>
+          <div class="page-title">Drop Hunter</div>
+          <div class="page-desc">Upcoming NFT mints across ETH, BTC Ordinals &amp; Solana. Watch a drop to pre-fill the bot, or jump straight to X to follow the team.</div>
         </div>
         <div class="api-bar">
           <div class="api-i"><div class="api-dot loading" id="osDot"></div><span class="api-lbl" id="osLbl">OpenSea: connecting&hellip;</span></div>
@@ -614,7 +556,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
           </div>
         </div>
 
-        <div class="blog" id="botLog"><div class="ll info"><span class="ts">[boot]</span>METAFRENS Terminal &mdash; Live APIs connected. Address-only signing. No keys. Ever.</div></div>
+        <div class="blog" id="botLog"><div class="ll info"><span class="ts">[boot]</span>METABOT &mdash; Mint Terminal online. Address-only signing. No keys. Ever.</div></div>
       </div>
 
       <!-- WATCHLIST -->
@@ -629,69 +571,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         </div>
         <div class="cgrid" id="svGrid"></div>
         <div class="empty-state" id="svEmpty"><div class="empty-icon">&#11088;</div><div class="empty-title">Nothing saved yet</div><div class="empty-sub">Star projects from Alpha Tracker to pin them here.</div></div>
-      </div>
-
-      <!-- COLLABS -->
-      <div class="page" id="pg-collabs">
-        <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-          <div>
-            <div class="page-title">Collab Hub</div>
-            <div class="page-desc">Track incoming requests, manage active deals, and coordinate with partners.</div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <a href="metafrens-collabs-public.html" target="_blank" class="btn btn-secondary btn-sm">&#127758; Public Page</a>
-            <button class="btn btn-primary btn-sm" id="newCollabBtn">+ New Collab</button>
-          </div>
-        </div>
-
-        <!-- STATS -->
-        <div class="collab-stats">
-          <div class="cstat"><div class="cstat-label">Total Collabs</div><div class="cstat-val" id="cs-total">0</div><div class="cstat-sub">All time</div></div>
-          <div class="cstat"><div class="cstat-label">Active</div><div class="cstat-val" id="cs-active" style="color:var(--green)">0</div><div class="cstat-sub">In progress</div></div>
-          <div class="cstat"><div class="cstat-label">WL Spots Given</div><div class="cstat-val" id="cs-wl" style="color:var(--blue)">0</div><div class="cstat-sub">To partner projects</div></div>
-          <div class="cstat"><div class="cstat-label">WL Spots Received</div><div class="cstat-val" id="cs-recv" style="color:var(--accent)">0</div><div class="cstat-sub">For the Familia</div></div>
-        </div>
-
-        <!-- ADD FORM -->
-        <div class="collab-form" id="collabForm" style="display:none;">
-          <div style="font-family:var(--font-d);font-size:13px;font-weight:800;color:var(--text);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
-            <span>New Collab Request</span>
-            <button class="btn btn-ghost btn-sm" id="closeCollabForm">&times; Cancel</button>
-          </div>
-          <div class="collab-form-grid">
-            <div class="lf"><label>Project Name</label><input type="text" id="cf-name" placeholder="e.g. The Beaks"/></div>
-            <div class="lf"><label>X Handle</label><input type="text" id="cf-handle" placeholder="@thebeaksart"/></div>
-            <div class="lf"><label>Chain</label>
-              <select id="cf-chain" class="form-input" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);width:100%;font-family:var(--font-b);font-size:12.5px;outline:none;">
-                <option value="ETH">Ethereum (ETH)</option>
-                <option value="BTC">Bitcoin Ordinals (BTC)</option>
-                <option value="SOL">Solana (SOL)</option>
-                <option value="Multi">Multi-chain</option>
-              </select>
-            </div>
-            <div class="lf"><label>Collection Supply</label><input type="number" id="cf-supply" placeholder="1111"/></div>
-            <div class="lf"><label>Mint Price</label><input type="text" id="cf-price" placeholder="0.025 ETH / Free"/></div>
-            <div class="lf"><label>Mint Date</label><input type="date" id="cf-date"/></div>
-            <div class="lf"><label>WL Spots Offered to MF</label><input type="number" id="cf-wl-recv" placeholder="20"/></div>
-            <div class="lf"><label>WL Spots We Give Them</label><input type="number" id="cf-wl-give" placeholder="20"/></div>
-            <div class="lf"><label>Contact</label><input type="text" id="cf-contact" placeholder="DM / Discord / Email"/></div>
-          </div>
-          <div class="lf" style="margin-top:4px;"><label>Deal Types</label>
-            <div class="deal-type-row">
-              <button class="deal-toggle wl" data-deal="wl">WL Allocation</button>
-              <button class="deal-toggle free" data-deal="free">Free Mint</button>
-              <button class="deal-toggle paid" data-deal="paid">Paid Mint</button>
-              <button class="deal-toggle rev" data-deal="rev">Revenue Share</button>
-            </div>
-          </div>
-          <div class="lf" style="margin-top:8px;"><label>Notes</label>
-            <textarea id="cf-notes" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 10px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:12px;outline:none;resize:vertical;min-height:64px;" placeholder="Context, terms, anything important..."></textarea>
-          </div>
-          <button class="btn btn-primary" id="saveCollabBtn" style="margin-top:4px;">Save Collab</button>
-        </div>
-
-        <!-- PIPELINE BOARD -->
-        <div class="pipeline" id="collabPipeline"></div>
       </div>
 
       <!-- RADAR -->
@@ -838,6 +717,33 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     </div><!-- /right-panel -->
   </div><!-- /content-area -->
 </div><!-- /main-wrap -->
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-item active" data-tab="tracker">
+    <div class="nav-icon" style="background:linear-gradient(135deg,#a855f7,#7c3aed)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    </div>
+    <span>Alpha</span>
+  </button>
+  <button class="nav-item" data-tab="bot">
+    <div class="nav-icon" style="background:#0a0a0a;border:1px solid rgba(255,255,255,0.15);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    </div>
+    <span>Bot</span>
+  </button>
+  <button class="nav-item" data-tab="radar">
+    <div class="nav-icon" style="background:linear-gradient(135deg,#06b6d4,#0891b2)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
+    </div>
+    <span>Radar</span>
+  </button>
+  <button class="nav-item" data-tab="watchlist">
+    <div class="nav-icon" style="background:linear-gradient(135deg,#10d97a,#047857)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    </div>
+    <span>Saved</span>
+  </button>
+</nav>
 </div><!-- /app -->
 
 <!-- MINT MODAL -->
@@ -1114,29 +1020,7 @@ function renderMkt(data){
 }
 
 /* X TWITTER EMBEDS */
-function loadTwEmbeds(){
-  const feed=$('twFeed');feed.innerHTML='';
-  STATE.tracked.forEach(h=>{
-    const slot=document.createElement('div');slot.className='tw-slot';
-    slot.innerHTML=`<div class="tw-lbl">@${h}</div><a class="twitter-timeline" data-theme="dark" data-chrome="noheader nofooter noborders transparent" data-tweet-limit="2" data-dnt="true" href="https://twitter.com/${h}?ref_src=twsrc%5Etfw"></a>`;
-    feed.appendChild(slot);
-  });
-  if(!window.twttr){
-    const s=document.createElement('script');s.src='https://platform.twitter.com/widgets.js';s.charset='utf-8';s.async=true;
-    s.onload=()=>{if(window.twttr?.widgets){window.twttr.widgets.load();setApi('x','live','X Embeds: LIVE');$('xSt').textContent='X LIVE ✓';log('X: Twitter widgets loaded','ok');}};
-    s.onerror=()=>{setApi('x','error','X: blocked by browser');$('xSt').textContent='X: BLOCKED';$('xSt').classList.remove('on');loadXFallback();};
-    document.head.appendChild(s);
-  }else{window.twttr.widgets.load();setApi('x','live','X Embeds: LIVE');}
-}
 
-function loadXFallback(){
-  $('twFeed').innerHTML=[
-    {h:'@thebeaksart',b:'The Beaks x Duce campaign LIVE. <b>150 GTD Beaklist spots</b> up for grabs. Submit UGC u2014 7 days.',t:'CAMPAIGN'},
-    {h:'@omistabtc',b:'identityMD mint open. Direct Etherscan. Ids 1-2000. <b>Community alpha 🔥</b>',t:'ALPHA'},
-    {h:'@Metafrens01',b:'Alpha Night recap live. New frens already sharing wins 💜',t:'UPDATE'},
-    {h:'@The_sugargirl',b:'While men slept, Metafrens was cooking. Free u2192 0.12 ETH on IdentityMD.',t:'PUMP'},
-  ].map(s=>`<div class="si"><div class="si-top"><span class="si-h">${s.h}</span><span class="si-t">recent</span></div><div class="si-b">${s.b}</div><span class="si-tag">${s.t}</span></div>`).join('');
-}
 
 /* ETH + GAS */
 // loadEth delegates to unified loadPrices
@@ -1148,7 +1032,7 @@ async function loadGas(){
   try{
     const r=await fetch('https://ethereum.publicnode.com',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'eth_gasPrice',params:[],id:1})});
     const d=await r.json();
-    if(d.result){ STATE.gasPrice=parseInt(d.result,16)/1e9; }
+    if(d.result){ STATE.gasPrice=parseInt(d.result,16)/1e9; const gEl=$("gasP"); if(gEl) gEl.textContent=STATE.gasPrice.toFixed(1); }
   }catch(e){}
 }
 
@@ -1239,7 +1123,8 @@ function renderCols(){
               ? `<span class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;color:var(--yellow);border-color:rgba(245,200,66,.3);cursor:default;">&#9201; Coming Soon</span>`
               : `<a class="btn btn-primary btn-sm" style="flex:1;justify-content:center;background:linear-gradient(135deg,#f97316,#c2410c);text-decoration:none;" href="https://www.satflow.com/collection/${encodeURIComponent(c.slug||c.name.toLowerCase().replace(/\s+/g,'-'))}" target="_blank" rel="noopener">Satflow &#8599;</a>
                  <a class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;text-decoration:none;border-color:rgba(249,115,22,.3);color:var(--btc);" href="https://ord.net/collection/${encodeURIComponent(c.slug||c.name.toLowerCase().replace(/\s+/g,'-'))}" target="_blank" rel="noopener">Ord.net &#8599;</a>`
-            : `<button class="btn btn-primary btn-sm" style="flex:1;justify-content:center;" data-action="snipe" data-name="${c.name}">${c.status==='live'?'&#9889; Snipe Now':'Watch &rarr;'}</button>`
+            : `<button class="btn btn-primary btn-sm" style="flex:1;justify-content:center;" data-action="snipe" data-name="${c.name}" data-slug="${c.slug||''}" data-status="${c.status||'upcoming'}">${c.status==='live'?'&#9889; Mint Now':'&#128269; Watch &rarr;'}</button>
+               <a class="btn btn-ghost btn-sm" style="flex:0;padding:6px 9px;text-decoration:none;color:var(--text2);" href="https://x.com/search?q=${encodeURIComponent(c.name)}&src=typed_query&f=live" target="_blank" rel="noopener" title="Search on X">&#120143;</a>`
           }
           </div>
         </div>
@@ -1252,21 +1137,40 @@ function renderCols(){
     renderCols();renderSaved();log(`${i>=0?'Removed':'Saved'} ${c.name}`,'info');
   }));
   $('cGrid').querySelectorAll('[data-action="snipe"]').forEach(b=>b.addEventListener('click',()=>{
-    const c=STATE.collections.find(x=>x.name===b.dataset.name);
-    document.querySelector('[data-tab="bot"]').click();$('mPrc').value=c.price||0;$('cAddr').focus();
-    log(`Pre-filling for ${c.name}`,'info');
+    const col=STATE.collections.find(x=>x.name===b.dataset.name);
+    const isLive=b.dataset.status==='live';
+    // Switch to Bot tab
+    document.querySelector('[data-tab="bot"]').click();
+    // Pre-fill the task form
+    setTimeout(()=>{
+      if($('uAddr')) $('uAddr').value='';
+      if($('cAddr')) $('cAddr').value=col.slug||col.contract||'';
+      if($('mPrc')) $('mPrc').value=col.price||0;
+      // If live on OpenSea, also pre-fill Mint Direct
+      if(isLive&&col.slug){
+        const mdUrl=$('mdUrl');
+        if(mdUrl){
+          mdUrl.value='https://opensea.io/collection/'+col.slug;
+          // Switch Mint Direct to ETH
+          const ethTab=document.querySelector('.md-chain-tab[data-mdchain="ETH"]');
+          if(ethTab) ethTab.click();
+          mdUrl.scrollIntoView({behavior:'smooth',block:'center'});
+          mdUrl.focus();
+          log('LIVE mint detected — pre-filled Mint Direct for '+col.name+'. Hit Fetch then Mint Now.','ok');
+        }
+      } else {
+        $('cAddr').focus();
+        log('Watching '+col.name+' — task form pre-filled. Set mode and schedule.','info');
+      }
+    },150);
   }));
 }
 
-function renderTracked(){
-  $('trcCnt').textContent=STATE.tracked.length;
-  $('trcList').innerHTML=STATE.tracked.map((h,i)=>`<div class="tr-row"><span class="tr-h">@${h}</span><button class="ibt" onclick="remTrc(${i})">×</button></div>`).join('');
-}
-function remTrc(i){STATE.tracked.splice(i,1);renderTracked();loadTwEmbeds();}
+function remTrc(i){STATE.tracked.splice(i,1);loadTwEmbeds();}
 $('addH').addEventListener('click',()=>{
   let h=$('newHandle').value.trim().replace('@','');
   if(!h||STATE.tracked.includes(h))return;
-  STATE.tracked.push(h);$('newHandle').value='';renderTracked();loadTwEmbeds();log('Now tracking @'+h,'ok');
+  STATE.tracked.push(h);$('newHandle').value='';loadTwEmbeds();log('Now tracking @'+h,'ok');
 });
 
 function renderSaved(){
@@ -1475,11 +1379,14 @@ function openModal(t){
 $('mdX').addEventListener('click',()=>$('modal').classList.remove('show'));
 $('modal').addEventListener('click',e=>{if(e.target.id==='modal')$('modal').classList.remove('show');});
 
-document.querySelectorAll('.nav-item').forEach(t=>t.addEventListener('click',()=>{
-  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+document.querySelectorAll('.bottom-nav .nav-item').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.bottom-nav .nav-item').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
-  $('pg-'+t.dataset.tab).classList.add('active');
+  const page=$('pg-'+t.dataset.tab);
+  if(page) page.classList.add('active');
+  // Trigger radar render when switching to radar tab
+  if(t.dataset.tab==='radar') setTimeout(renderRadarFeed,50);
 }));
 ['fSrc','fStat','fSort','fSrch'].forEach(id=>{$(id).addEventListener('change',renderCols);$(id).addEventListener('input',renderCols);});
 $('refBtn').addEventListener('click',()=>{log('Refreshing all sources...','info');fetchOs();fetchCg();fetchOrdinals();loadEth();loadGas();loadBtc();});
@@ -1497,7 +1404,7 @@ async function init(){
   setInterval(loadPrices,30e3);setInterval(loadGas,60e3);
   setInterval(()=>{fetchOs();fetchCg();fetchOrdinals();},5*60e3);
   const t=new Date();t.setHours(t.getHours()+1);$('mTime').value=t.toISOString().slice(0,16);
-  renderTracked();renderTasks();renderSaved();
+  renderTasks();renderSaved();
   log('Connecting to live data sources...','info');
   await Promise.all([loadPrices(),loadGas(),getOsKey().then(()=>fetchOs()),fetchCg(),fetchOrdinals()]);
   setTimeout(()=>loadTwEmbeds(),600);
@@ -2016,174 +1923,9 @@ $('radarNotifBtn')?.addEventListener('click',radarRequestNotif);
 if(Notification.permission==='granted')RADAR.notifGranted=true;
 updateNotifBanner();
 
-const COLLAB_STAGES = [
-  { id:'incoming', label:'Incoming',   color:'#4f8ef7' },
-  { id:'review',   label:'Reviewing',  color:'#f5c842' },
-  { id:'approved', label:'Approved',   color:'#a855f7' },
-  { id:'announced',label:'Announced',  color:'#10d97a' },
-  { id:'done',     label:'Done',       color:'#42454f' },
-];
-
-const STORAGE_KEY = 'mf_collabs_v1';
-
-function loadCollabs(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); }catch{ return []; } }
-function saveCollabs(list){ localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); syncPublicPage(list); }
-
-// Sync to sessionStorage so public page can read it
-function syncPublicPage(list){ try{ localStorage.setItem('mf_collabs_public', JSON.stringify(list.filter(c=>c.stage==='announced'||c.stage==='done'))); }catch{} }
-
-let activeDealTypes = [];
-
-// Deal type toggles
-document.addEventListener('click', e => {
-  if(e.target.classList.contains('deal-toggle')){
-    e.target.classList.toggle('active');
-    const dt = e.target.dataset.deal;
-    if(activeDealTypes.includes(dt)) activeDealTypes = activeDealTypes.filter(x=>x!==dt);
-    else activeDealTypes.push(dt);
-  }
-});
-
-$('newCollabBtn').addEventListener('click', ()=>{
-  $('collabForm').style.display = $('collabForm').style.display==='none' ? 'block' : 'none';
-});
-$('closeCollabForm').addEventListener('click', ()=>{ $('collabForm').style.display='none'; });
-
-$('saveCollabBtn').addEventListener('click', ()=>{
-  const name = $('cf-name').value.trim();
-  if(!name){ log('Collab needs a project name','err'); return; }
-  const collab = {
-    id: 'collab_'+Date.now(),
-    name,
-    handle:   $('cf-handle').value.trim(),
-    chain:    $('cf-chain').value,
-    supply:   parseInt($('cf-supply').value)||0,
-    price:    $('cf-price').value.trim(),
-    mintDate: $('cf-date').value,
-    wlRecv:   parseInt($('cf-wl-recv').value)||0,
-    wlGive:   parseInt($('cf-wl-give').value)||0,
-    contact:  $('cf-contact').value.trim(),
-    deals:    [...activeDealTypes],
-    notes:    $('cf-notes').value.trim(),
-    stage:    'incoming',
-    createdAt: new Date().toISOString(),
-  };
-  const list = loadCollabs();
-  list.unshift(collab);
-  saveCollabs(list);
-  // reset form
-  ['cf-name','cf-handle','cf-supply','cf-price','cf-date','cf-wl-recv','cf-wl-give','cf-contact','cf-notes'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
-  document.querySelectorAll('.deal-toggle').forEach(b=>b.classList.remove('active'));
-  activeDealTypes = [];
-  $('collabForm').style.display='none';
-  renderCollabPipeline();
-  log('Collab added: '+name,'ok');
-});
-
-function moveCollab(id, stage){
-  const list = loadCollabs();
-  const c = list.find(x=>x.id===id);
-  if(c){ c.stage=stage; saveCollabs(list); renderCollabPipeline(); }
-}
-
-function deleteCollab(id){
-  if(!confirm('Delete this collab?')) return;
-  saveCollabs(loadCollabs().filter(x=>x.id!==id));
-  renderCollabPipeline();
-}
-
-function renderCollabPipeline(){
-  const list = loadCollabs();
-  const pipe = $('collabPipeline');
-  if(!pipe) return;
-
-  // Update stats
-  const active = list.filter(c=>['incoming','review','approved'].includes(c.stage)).length;
-  const wlGiven = list.reduce((s,c)=>s+(c.wlGive||0),0);
-  const wlRecvd = list.reduce((s,c)=>s+(c.wlRecv||0),0);
-  $('cs-total').textContent = list.length;
-  $('cs-active').textContent = active;
-  $('cs-wl').textContent = wlGiven;
-  $('cs-recv').textContent = wlRecvd;
-
-  pipe.innerHTML = COLLAB_STAGES.map(stage=>{
-    const cards = list.filter(c=>c.stage===stage.id);
-    const otherStages = COLLAB_STAGES.filter(s=>s.id!==stage.id);
-    return `
-      <div class="pipe-col" style="border-top:2px solid ${stage.color}20;">
-        <div class="pipe-col-head">
-          <span class="pipe-col-title" style="color:${stage.color}">${stage.label}</span>
-          <span class="pipe-col-count">${cards.length}</span>
-        </div>
-        ${cards.map(c=>{
-          const chainTag = `<span class="cc-tag ${c.chain==='BTC'?'btc':'eth'}">${c.chain}</span>`;
-          const dealTags = (c.deals||[]).map(d=>`<span class="cc-tag ${d}">${d.toUpperCase()}</span>`).join('');
-          const moveOpts = otherStages.map(s=>`<button class="btn btn-ghost btn-sm" style="font-size:9px;padding:3px 7px;" onclick="moveCollab('${c.id}','${s.id}')">&rarr; ${s.label}</button>`).join('');
-          const dateStr = c.mintDate ? new Date(c.mintDate).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
-          return `<div class="collab-card" onclick="openCollabDetail('${c.id}')">
-            <div class="cc-name">${c.name.slice(0,16)} ${chainTag}</div>
-            <div class="cc-handle">${c.handle||'—'}</div>
-            <div class="cc-meta">
-              <div><span class="cc-meta-label">Supply</span><span class="cc-meta-val">${c.supply?c.supply.toLocaleString():'—'}</span></div>
-              <div><span class="cc-meta-label">Price</span><span class="cc-meta-val">${c.price||'—'}</span></div>
-              <div><span class="cc-meta-label">WL Given</span><span class="cc-meta-val" style="color:var(--blue)">${c.wlGive||0}</span></div>
-              <div><span class="cc-meta-label">WL Recv'd</span><span class="cc-meta-val" style="color:var(--accent)">${c.wlRecv||0}</span></div>
-            </div>
-            <div class="cc-tags">${dealTags}</div>
-            <div class="cc-actions" onclick="event.stopPropagation()">
-              ${moveOpts}
-              <button class="btn btn-danger btn-sm" style="font-size:9px;padding:3px 7px;" onclick="deleteCollab('${c.id}')">&#128465;</button>
-            </div>
-          </div>`;
-        }).join('')}
-        <div class="pipe-add-btn">
-          <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;font-size:10px;" onclick="$('newCollabBtn').click();$('collabForm').scrollIntoView({behavior:'smooth'})">+ Add here</button>
-        </div>
-      </div>`;
-  }).join('');
-}
-
-function openCollabDetail(id){
-  const c = loadCollabs().find(x=>x.id===id);
-  if(!c) return;
-  const modal = document.getElementById('collabDetailModal');
-  document.getElementById('cdm-body').innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <div>
-        <h2>${c.name}</h2>
-        <div style="font-size:12px;color:var(--text3);">${c.handle||''} &middot; ${c.chain} &middot; Added ${new Date(c.createdAt).toLocaleDateString()}</div>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('collabDetailModal').classList.remove('show')">&times; Close</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
-      ${[
-        ['Supply',c.supply?c.supply.toLocaleString():'—'],
-        ['Price',c.price||'—'],
-        ['Mint Date',c.mintDate||'—'],
-        ['WL Given',c.wlGive||0],
-        ['WL Received',c.wlRecv||0],
-        ['Contact',c.contact||'—'],
-      ].map(([l,v])=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">${l}</div><div style="font-size:13px;font-weight:600;color:var(--text);">${v}</div></div>`).join('')}
-    </div>
-    ${(c.deals||[]).length?`<div style="margin-bottom:12px;"><div style="font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Deal Types</div><div style="display:flex;gap:6px;">${c.deals.map(d=>`<span class="cc-tag ${d}" style="font-size:10px;">${d.toUpperCase()}</span>`).join('')}</div></div>`:''}
-    ${c.notes?`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;"><div style="font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Notes</div><div style="font-size:12.5px;color:var(--text2);line-height:1.6;">${c.notes}</div></div>`:''}
-    <div style="margin-bottom:10px;"><div style="font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Move Stage</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">${COLLAB_STAGES.filter(s=>s.id!==c.stage).map(s=>`<button class="btn btn-secondary btn-sm" onclick="moveCollab('${c.id}','${s.id}');document.getElementById('collabDetailModal').classList.remove('show');">&rarr; ${s.label}</button>`).join('')}</div>
-    </div>`;
-  modal.classList.add('show');
-}
-
-// Initial render when tab opens
-document.querySelector('[data-tab="collabs"]').addEventListener('click', ()=>{
-  setTimeout(renderCollabPipeline, 50);
-});
 
 init();
 </script>
 
-<!-- COLLAB DETAIL MODAL -->
-<div class="collab-detail-modal" id="collabDetailModal">
-  <div class="cdm-inner" id="cdm-body"></div>
-</div>
 </body>
 </html>
