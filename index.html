@@ -4,7 +4,26 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>METABOT</title>
-<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+<script>
+// Load ethers with fallback CDNs
+(function(){
+  const cdns=[
+    'https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js',
+    'https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js'
+  ];
+  let idx=0;
+  function load(){
+    if(idx>=cdns.length){console.warn('ethers failed to load from all CDNs');return;}
+    const s=document.createElement('script');
+    s.src=cdns[idx++];
+    s.onload=()=>console.log('ethers loaded from',s.src);
+    s.onerror=()=>{console.warn('CDN failed, trying next...');load();};
+    document.head.appendChild(s);
+  }
+  load();
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css"/>
 </head>
