@@ -17,7 +17,7 @@
   --r:8px;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;background:var(--bg);color:var(--t0);font-family:var(--fm);font-size:13px;overflow:hidden;}
+html,body{height:100%;background:var(--bg);color:var(--t0);font-family:var(--fm);font-size:13px;}
 ::-webkit-scrollbar{width:2px;}
 ::-webkit-scrollbar-thumb{background:var(--s3);}
 
@@ -26,7 +26,7 @@ html,body{height:100%;background:var(--bg);color:var(--t0);font-family:var(--fm)
 /* TOPBAR */
 .topbar{
   display:flex;align-items:center;justify-content:space-between;
-  padding:0 32px;background:var(--bg);
+  padding:0 24px;background:var(--bg);
   border-bottom:1px solid var(--b0);
 }
 .brand{display:flex;align-items:center;gap:9px;}
@@ -46,7 +46,8 @@ html,body{height:100%;background:var(--bg);color:var(--t0);font-family:var(--fm)
 #clk{font-size:10px;color:var(--t2);letter-spacing:.05em;padding-left:18px;border-left:1px solid var(--b1);}
 
 /* BODY — single scrollable column */
-.body{overflow-y:auto;height:100%;padding:36px 32px 40px;}
+.body{overflow-y:auto;height:100%;padding:36px 0 40px;}
+.inner{max-width:480px;margin:0 auto;padding:0 24px;}
 
 /* dividers between sections */
 .div{height:1px;background:var(--b0);margin:32px 0;}
@@ -213,11 +214,10 @@ input::placeholder{color:var(--t2);}
 @keyframes flashUp{0%{background:rgba(34,197,94,.15)}100%{background:transparent}}
 @keyframes flashDown{0%{background:rgba(239,68,68,.15)}100%{background:transparent}}
 
-@media(max-width:640px){
-  .body{padding:20px 18px 32px;}
+@media(max-width:480px){
+  .inner{padding:0 16px;}
   .g2,.g3{grid-template-columns:1fr;}
   .md-grid{grid-template-columns:1fr 1fr;}
-  .tc-meta{grid-template-columns:1fr 1fr;}
 }
 </style>
 </head>
@@ -239,6 +239,7 @@ input::placeholder{color:var(--t2);}
 
 <!-- BODY -->
 <div class="body">
+<div class="inner">
 
   <!-- WALLET + CONTRACT -->
   <div class="field">
@@ -336,6 +337,7 @@ input::placeholder{color:var(--t2);}
   </div>
   <div class="md-st" id="mdStatus"></div>
 
+</div><!-- /inner -->
 </div><!-- /body -->
 </div><!-- /app -->
 
