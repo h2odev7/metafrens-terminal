@@ -57,10 +57,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 @keyframes priceFlashDown{0%{background:rgba(240,69,69,.25);}100%{background:transparent;}}
 #clk{font-size:11.5px;color:var(--text2);font-variant-numeric:tabular-nums;}
 
-.content-area{display:flex;flex:1;overflow:hidden;min-height:0;}
+.content-area{flex:1;overflow:hidden;min-height:0;display:flex;}
 
 /* LEFT PANEL */
-.left-panel{width:290px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:20px 16px;}
 .panel-sec{margin-bottom:20px;}
 .panel-sec-title{font-size:9.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;}
 .panel-sec-title .cnt{color:var(--accent);}
@@ -100,7 +99,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .mkt-name{font-size:11.5px;font-weight:600;color:var(--text);}
 
 /* RIGHT / PAGE AREA */
-.right-panel{flex:1;overflow-y:auto;}
+.right-panel{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
 .page{display:none;padding:26px 28px;}
 .page.active{display:block;}
 .page-header{margin-bottom:22px;}
@@ -376,28 +375,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   </div>
 
   <div class="content-area">
-    <!-- LEFT PANEL -->
-    <div class="left-panel">
-      <div class="hero">
-        <h1>Mint smarter.<br><em>frens</em> go first.</h1>
-        <p>Live upcoming drops from OpenSea, Ordinals &amp; CoinGecko. Spot early, mint fast.</p>
-        <div class="hbadges">
-          <span class="hb on" id="osSt">OPENSEA</span>
-          <span class="hb on">ORDINALS</span>
-          <span class="hb">NO KEYS</span>
-        </div>
-      </div>
-
-      <div class="pdiv"></div>
-
-      <div class="panel-sec">
-        <div class="panel-sec-title">Market Signals <span class="cnt">COINGECKO</span></div>
-        <div id="mktFeed"><div style="font-size:11px;color:var(--text3);text-align:center;padding:10px;">Loading&hellip;</div></div>
-      </div>
-    </div>
-
-    <!-- RIGHT PANEL -->
-    <div class="right-panel">
+    <!-- MAIN PANEL -->
+    <div class="right-panel" style="flex:1;overflow-y:auto;padding-bottom:0;">
 
       <!-- TRACKER -->
       <div class="page active" id="pg-tracker">
@@ -409,8 +388,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
           <div class="api-i"><div class="api-dot loading" id="osDot"></div><span class="api-lbl" id="osLbl">OpenSea: connecting&hellip;</span></div>
           <div class="api-i"><div class="api-dot loading" id="ordDot"></div><span class="api-lbl" id="ordLbl">Ordinals: connecting&hellip;</span></div>
           <div class="api-i"><div class="api-dot loading" id="cgDot"></div><span class="api-lbl" id="cgLbl">CoinGecko: connecting&hellip;</span></div>
-          <div class="api-i"><div class="api-dot loading" id="ethDot"></div><span class="api-lbl" id="ethLbl">ETH/Gas: connecting&hellip;</span></div>
-          <div class="api-i"><div class="api-dot loading" id="xDot"></div><span class="api-lbl" id="xLbl">X Embeds: loading&hellip;</span></div>
         </div>
         <div class="filter-bar">
           <div class="fg"><label>Chain</label><select class="l-sel" id="fSrc"><option value="all">All Chains</option><option value="opensea">ETH (OpenSea)</option><option value="ordinals">BTC (Ordinals)</option><option value="coingecko">CoinGecko</option><option value="metafrens">MF Picks</option></select></div>
@@ -765,21 +742,32 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 
 <script>
 const $=id=>document.getElementById(id);
-// CORS proxy chain — tries each in order until one works
+// CORS handler — direct first, then proxy fallbacks
 async function corsGet(url, opts={}) {
+  // Direct fetch first — works for CoinGecko, CoinCap, Hiro, Solana RPC
+  try{
+    const r = await Promise.race([
+      fetch(url, opts),
+      new Promise((_,rej)=>setTimeout(()=>rej('timeout'),5000))
+    ]);
+    if(r.ok) return r;
+  }catch(e){}
+  // CORS proxy fallback chain
   const proxies = [
     u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
     u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-    u => `https://cors-anywhere.herokuapp.com/${u}`,
   ];
   let lastErr;
   for(const proxy of proxies){
     try{
-      const r = await fetch(proxy(url), opts);
+      const r = await Promise.race([
+        fetch(proxy(url), opts),
+        new Promise((_,rej)=>setTimeout(()=>rej('timeout'),6000))
+      ]);
       if(r.ok || r.status===200) return r;
     }catch(e){ lastErr=e; }
   }
-  throw lastErr||new Error('All CORS proxies failed for: '+url);
+  throw lastErr||new Error('All requests failed: '+url);
 }
 const CORS=u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`;
 const STATE={osKey:null,collections:[],tasks:[],saved:[],mode:'scheduled',chain:'ETH',ethPrice:0,btcPrice:0,gasPrice:0,tracked:['Metafrens01','OmistaBTC','The_sugargirl','thebeaksart','OnlyCapi']};
@@ -967,12 +955,10 @@ async function fetchOs(){
     });
     STATE.collections=[...STATE.collections.filter(c=>c.source!=='opensea'&&!cols.find(x=>x.name.toLowerCase()===c.name.toLowerCase())),...cols.filter(c=>c.name)];
     setApi('os','live','OpenSea: LIVE');
-    $('osSt').textContent='OPENSEA ✓';
     log('OpenSea: '+cols.length+' newest upcoming drops','ok');
     renderCols();
   }catch(e){
     setApi('os','error','OpenSea: error');
-    $('osSt').textContent='OPENSEA ✗';$('osSt').classList.remove('on');
     log('OpenSea error — showing community picks','warn');
     loadFallback();
   }
@@ -1140,7 +1126,8 @@ function renderCols(){
     const col=STATE.collections.find(x=>x.name===b.dataset.name);
     const isLive=b.dataset.status==='live';
     // Switch to Bot tab
-    document.querySelector('[data-tab="bot"]').click();
+    const botBtn=document.querySelector('.bottom-nav [data-tab="bot"]');
+    if(botBtn) botBtn.click();
     // Pre-fill the task form
     setTimeout(()=>{
       if($('uAddr')) $('uAddr').value='';
@@ -1166,11 +1153,11 @@ function renderCols(){
   }));
 }
 
-function remTrc(i){STATE.tracked.splice(i,1);loadTwEmbeds();}
+function remTrc(i){STATE.tracked.splice(i,1);}
 $('addH').addEventListener('click',()=>{
   let h=$('newHandle').value.trim().replace('@','');
   if(!h||STATE.tracked.includes(h))return;
-  STATE.tracked.push(h);$('newHandle').value='';loadTwEmbeds();log('Now tracking @'+h,'ok');
+  STATE.tracked.push(h);$('newHandle').value='';log('Now tracking @'+h,'ok');
 });
 
 function renderSaved(){
@@ -1379,15 +1366,21 @@ function openModal(t){
 $('mdX').addEventListener('click',()=>$('modal').classList.remove('show'));
 $('modal').addEventListener('click',e=>{if(e.target.id==='modal')$('modal').classList.remove('show');});
 
-document.querySelectorAll('.bottom-nav .nav-item').forEach(t=>t.addEventListener('click',()=>{
-  document.querySelectorAll('.bottom-nav .nav-item').forEach(x=>x.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
-  t.classList.add('active');
-  const page=$('pg-'+t.dataset.tab);
-  if(page) page.classList.add('active');
-  // Trigger radar render when switching to radar tab
-  if(t.dataset.tab==='radar') setTimeout(renderRadarFeed,50);
-}));
+function initNav(){
+  document.querySelectorAll('.bottom-nav .nav-item').forEach(t=>t.addEventListener('click',()=>{
+    document.querySelectorAll('.bottom-nav .nav-item').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    const page=$('pg-'+t.dataset.tab);
+    if(page) page.classList.add('active');
+    if(t.dataset.tab==='radar') setTimeout(renderRadarFeed,50);
+  }));
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded', initNav);
+} else {
+  initNav();
+}
 ['fSrc','fStat','fSort','fSrch'].forEach(id=>{$(id).addEventListener('change',renderCols);$(id).addEventListener('input',renderCols);});
 $('refBtn').addEventListener('click',()=>{log('Refreshing all sources...','info');fetchOs();fetchCg();fetchOrdinals();loadEth();loadGas();loadBtc();});
 
@@ -1407,7 +1400,6 @@ async function init(){
   renderTasks();renderSaved();
   log('Connecting to live data sources...','info');
   await Promise.all([loadPrices(),loadGas(),getOsKey().then(()=>fetchOs()),fetchCg(),fetchOrdinals()]);
-  setTimeout(()=>loadTwEmbeds(),600);
 }
 /* ═══════════════════════════════════════
    MINT DIRECT — multi-chain paste & mint
