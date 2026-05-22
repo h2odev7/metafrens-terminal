@@ -99,7 +99,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 
 /* RIGHT / PAGE AREA */
 .right-panel{flex:1;overflow-y:auto;display:flex;flex-direction:column;width:100%;}
-.page{display:none;padding:26px 28px;}
+.page{display:none;padding:28px 32px;}
 .page.active{display:block;}
 .page-header{margin-bottom:22px;}
 .page-title{font-family:var(--font-d);font-size:24px;font-weight:800;letter-spacing:-.03em;background:linear-gradient(135deg,#fff 50%,rgba(168,85,247,.85));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
@@ -179,7 +179,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .w90{width:90%;}.w70{width:70%;}.w50{width:50%;}
 
 /* MINT BOT */
-.bot-layout{display:grid;grid-template-columns:258px 1fr;gap:16px;}
+.bot-layout{display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start;}
 .bot-form{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:17px;}
 .bot-form h4{font-family:var(--font-d);font-weight:800;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:13px;padding-bottom:7px;border-bottom:1px solid var(--border);}
 .lf{margin-bottom:10px;}
@@ -360,7 +360,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <div class="live-dot"></div>
       <div>
         <div class="page-label">METABOT</div>
-        <div class="page-sublabel" style="color:var(--accent);font-weight:600;">Mint Terminal</div>
+        
       </div>
     </div>
     <div class="topbar-right">
@@ -380,7 +380,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <!-- MINT BOT -->
       <div class="page active" id="pg-bot">
         <div class="page-header">
-          <div class="page-title">Mint Bot</div>
+          <div class="page-title">Mint Terminal</div>
           <div class="page-desc">Multi-chain mint assistant &mdash; ETH, BTC Ordinals &amp; Solana. Paste your wallet address, bot pre-builds the tx, you sign in your wallet. No keys ever.</div>
         </div>
         <div class="bot-layout">
@@ -445,17 +445,26 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 
             <button class="btn btn-primary" id="addTask" style="width:100%;justify-content:center;padding:10px;">+ Add Task</button>
           </div>
-          <div>
-            <div class="sec-hdr">
-              <span class="sec-title">ACTIVE TASKS</span>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;min-height:500px;">
+            <div class="sec-hdr" style="margin-bottom:16px;">
+              <div>
+                <div style="font-family:var(--font-d);font-weight:800;font-size:13px;color:var(--text);">ACTIVE TASKS</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px;">Scheduled, sniping and manual tasks</div>
+              </div>
               <span class="badge badge-purple" id="tskCnt">0 tasks</span>
             </div>
-            <div id="actTasks"></div>
+            <div id="actTasks">
+              <div style="text-align:center;padding:60px 20px;">
+                <div style="font-size:36px;margin-bottom:12px;opacity:.15;">&#9889;</div>
+                <div style="font-size:13px;font-weight:600;color:var(--text2);">No active tasks</div>
+                <div style="font-size:11.5px;color:var(--text3);margin-top:4px;">Fill in the form and hit + Add Task to queue a mint.</div>
+              </div>
+            </div>
           </div>
         </div>
 
         <!-- MINT DIRECT -->
-        <div style="margin-top:20px;">
+        <div style="margin-top:24px;border-top:1px solid var(--border);padding-top:24px;">
           <div class="sec-hdr" style="margin-bottom:12px;">
             <span class="sec-title">&#9889; MINT DIRECT</span>
             <span class="badge badge-purple">ETH &middot; BTC &middot; SOL</span>
@@ -1019,7 +1028,7 @@ function fD(d){const df=d-new Date();if(df<0)return'PASSED';const dy=Math.floor(
 
 function renderTasks(){
   $('tskCnt').textContent=STATE.tasks.length+' tasks';
-  if(!STATE.tasks.length){$('actTasks').innerHTML='<div class="empty"><b>No active tasks.</b>Add one using the form.</div>';return;}
+  if(!STATE.tasks.length){$('actTasks').innerHTML='<div style="text-align:center;padding:60px 20px;"><div style="font-size:36px;margin-bottom:12px;opacity:.15;">&#9889;</div><div style="font-size:13px;font-weight:600;color:var(--text2);">No active tasks</div><div style="font-size:11.5px;color:var(--text3);margin-top:4px;">Fill in the form and hit + Add Task to queue a mint.</div></div>';return;}
   $('actTasks').innerHTML=STATE.tasks.map(t=>{
     const tot=(t.price*t.qty).toFixed(4);
     const tm=t.mode==='scheduled'&&t.time?fD(t.time):t.mode==='sniper'?'WATCHING':'ON DEMAND';
