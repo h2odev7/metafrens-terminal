@@ -49,6 +49,7 @@ function log(msg,t=''){
 
 /* ── WALLET CONNECTION (ethers.js) ── */
 async function connectWallet(){
+  if(typeof ethers==='undefined'){log('ethers.js still loading — retry in a moment','warn');return;}
   if(!window.ethereum){
     alert('MetaMask not detected. Install MetaMask to mint on-chain.');
     return;
@@ -134,6 +135,7 @@ async function analyze(){
 
 /* ── MINT NOW via ethers.js ── */
 async function mintNow(){
+  if(typeof ethers==='undefined'){log('ethers.js not loaded','err');return;}
   if(!S.signer){log('Connect wallet first','err');return;}
   const contract=$('cAddr').value.trim();
   if(!contract.match(/^0x[a-fA-F0-9]{40}$/)){log('Invalid contract address','err');return;}
@@ -309,7 +311,7 @@ async function signWithMetaMask(){
 }
 
 function buildCalldata(fn,qty){
-  // Encode function selector + uint256 arg
+  if(typeof ethers==='undefined')return '0x1249c58b'+'0'.repeat(64);
   const sig=fn.trim();
   const selector=ethers.utils.id(sig).slice(0,10);
   const encoded=ethers.utils.defaultAbiCoder.encode(['uint256'],[qty]);
@@ -404,6 +406,12 @@ $('mdQueue').addEventListener('click',()=>{
 });
 
 /* ── INIT ── */
+function waitForEthers(cb,attempts=0){
+  if(typeof ethers!=='undefined'){cb();return;}
+  if(attempts>40){console.warn('ethers never loaded');cb();return;}
+  setTimeout(()=>waitForEthers(cb,attempts+1),150);
+}
+
 async function init(){
   tick();setInterval(tick,1e3);setInterval(tickTasks,1e3);
   setInterval(loadPrices,30e3);setInterval(loadGas,30e3);
@@ -411,4 +419,5 @@ async function init(){
   renderTasks();
   await Promise.all([loadPrices(),loadGas()]);
 }
-init();
+
+waitForEthers(()=>init());
