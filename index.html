@@ -22,24 +22,23 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--surface4);border-radius:4px;}
 
-.app{display:flex;flex-direction:column;height:100vh;}
-.main-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
+.app{display:flex;flex-direction:row;height:100vh;}
+.main-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;min-width:0;}
 
 /* BOTTOM NAV */
 .bottom-nav{
-  display:flex;flex-direction:row;align-items:center;justify-content:center;
-  gap:6px;padding:8px 16px;
-  background:var(--surface);border-top:1px solid var(--border);
-  flex-shrink:0;z-index:10;
-  box-shadow:0 -4px 24px rgba(0,0,0,.3);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:6px;padding:16px 6px;
+  background:var(--surface);border-left:1px solid var(--border);
+  flex-shrink:0;width:72px;z-index:10;
 }
-.bottom-nav::before{content:'';position:absolute;bottom:100%;left:0;right:0;height:1px;background:linear-gradient(to right,transparent,rgba(168,85,247,.3),transparent);}
+.bottom-nav::before{content:'';position:absolute;top:0;left:-1px;width:1px;height:100%;background:linear-gradient(to bottom,transparent,rgba(168,85,247,.3),transparent);}
 .bottom-nav{position:relative;}
 
-.nav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 18px;border-radius:var(--radius-sm);cursor:pointer;font-size:9px;font-weight:600;color:var(--text2);transition:all .18s;text-align:center;border:none;background:none;min-width:64px;}
+.nav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:14px 6px;border-radius:var(--radius-sm);cursor:pointer;font-size:10px;font-weight:700;color:var(--text2);transition:all .18s;text-align:center;border:none;background:none;width:66px;}
 .nav-item:hover{background:var(--surface2);color:var(--text);}
 .nav-item.active{background:var(--surface2);color:var(--accent);}
-.nav-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:all .18s;}
+.nav-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;transition:all .18s;}
 .nav-item.active .nav-icon{box-shadow:0 4px 14px rgba(168,85,247,.4);}
 
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:13px 26px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;}
@@ -99,7 +98,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .mkt-name{font-size:11.5px;font-weight:600;color:var(--text);}
 
 /* RIGHT / PAGE AREA */
-.right-panel{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
+.right-panel{flex:1;overflow-y:auto;display:flex;flex-direction:column;width:100%;}
 .page{display:none;padding:26px 28px;}
 .page.active{display:block;}
 .page-header{margin-bottom:22px;}
@@ -256,9 +255,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   .live-dot{width:6px;height:6px;}
   .page{padding:16px 14px;}
   .page-title{font-size:20px;}
-  .bottom-nav{gap:2px;padding:6px 8px;}
+  .bottom-nav{flex-direction:row;width:100%;border-left:none;border-top:1px solid var(--border);padding:6px 8px;justify-content:center;}
   .nav-item{min-width:52px;padding:6px 10px;font-size:8px;}
   .nav-icon{width:24px;height:24px;}
+  .app{flex-direction:column;}
 }
 
 /* ── COLLABS ── */
@@ -377,41 +377,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   <div class="content-area">
     <!-- MAIN PANEL -->
     <div class="right-panel" style="flex:1;overflow-y:auto;padding-bottom:0;">
-
-      <!-- TRACKER -->
-      <div class="page active" id="pg-tracker">
-        <div class="page-header">
-          <div class="page-title">Drop Hunter</div>
-          <div class="page-desc">Upcoming NFT mints across ETH, BTC Ordinals &amp; Solana. Watch a drop to pre-fill the bot, or jump straight to X to follow the team.</div>
-        </div>
-        <div class="api-bar">
-          <div class="api-i"><div class="api-dot loading" id="osDot"></div><span class="api-lbl" id="osLbl">OpenSea: connecting&hellip;</span></div>
-          <div class="api-i"><div class="api-dot loading" id="ordDot"></div><span class="api-lbl" id="ordLbl">Ordinals: connecting&hellip;</span></div>
-          <div class="api-i"><div class="api-dot loading" id="cgDot"></div><span class="api-lbl" id="cgLbl">CoinGecko: connecting&hellip;</span></div>
-        </div>
-        <div class="filter-bar">
-          <div class="fg"><label>Chain</label><select class="l-sel" id="fSrc"><option value="all">All Chains</option><option value="opensea">ETH (OpenSea)</option><option value="ordinals">BTC (Ordinals)</option><option value="coingecko">CoinGecko</option><option value="metafrens">MF Picks</option></select></div>
-          <div class="fg"><label>Status</label><select class="l-sel" id="fStat"><option value="all">All</option><option value="upcoming">Upcoming</option><option value="live">Minting Now</option></select></div>
-          <div class="fg"><label>Sort</label><select class="l-sel" id="fSort"><option value="hype">Hype</option><option value="date">Mint Date</option><option value="supply">Supply</option><option value="price">Price</option></select></div>
-          <div class="fg"><label>Search</label><input type="text" class="l-inp" id="fSrch" placeholder="collection name&hellip;"/></div>
-          <button class="btn btn-secondary" id="refBtn" style="align-self:flex-end">&larrhk; Refresh</button>
-        </div>
-        <div class="sec-hdr">
-          <span class="sec-title">UPCOMING DROPS</span>
-          <span class="badge badge-purple" id="cCnt">loading&hellip;</span>
-        </div>
-        <div class="cgrid" id="cGrid">
-          <div class="ccard"><div class="skel skel-img"></div><div class="skel-body"><div class="skel skel-line w90"></div><div class="skel skel-line w50"></div><div class="skel skel-line w70"></div></div></div>
-          <div class="ccard"><div class="skel skel-img"></div><div class="skel-body"><div class="skel skel-line w90"></div><div class="skel skel-line w50"></div><div class="skel skel-line w70"></div></div></div>
-          <div class="ccard"><div class="skel skel-img"></div><div class="skel-body"><div class="skel skel-line w90"></div><div class="skel skel-line w50"></div><div class="skel skel-line w70"></div></div></div>
-          <div class="ccard"><div class="skel skel-img"></div><div class="skel-body"><div class="skel skel-line w90"></div><div class="skel skel-line w50"></div><div class="skel skel-line w70"></div></div></div>
-          <div class="ccard"><div class="skel skel-img"></div><div class="skel-body"><div class="skel skel-line w90"></div><div class="skel skel-line w50"></div><div class="skel skel-line w70"></div></div></div>
-          <div class="ccard"><div class="skel skel-img"></div><div class="skel-body"><div class="skel skel-line w90"></div><div class="skel skel-line w50"></div><div class="skel skel-line w70"></div></div></div>
-        </div>
-      </div>
-
       <!-- MINT BOT -->
-      <div class="page" id="pg-bot">
+      <div class="page active" id="pg-bot">
         <div class="page-header">
           <div class="page-title">Mint Bot</div>
           <div class="page-desc">Multi-chain mint assistant &mdash; ETH, BTC Ordinals &amp; Solana. Paste your wallet address, bot pre-builds the tx, you sign in your wallet. No keys ever.</div>
@@ -536,191 +503,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         <div class="blog" id="botLog"><div class="ll info"><span class="ts">[boot]</span>METABOT &mdash; Mint Terminal online. Address-only signing. No keys. Ever.</div></div>
       </div>
 
-      <!-- WATCHLIST -->
-      <div class="page" id="pg-watchlist">
-        <div class="page-header">
-          <div class="page-title">Watchlist</div>
-          <div class="page-desc">Saved collections &mdash; star anything from the Alpha Tracker to pin it here.</div>
-        </div>
-        <div class="sec-hdr">
-          <span class="sec-title">SAVED COLLECTIONS</span>
-          <span class="badge badge-purple" id="svCnt">0 saved</span>
-        </div>
-        <div class="cgrid" id="svGrid"></div>
-        <div class="empty-state" id="svEmpty"><div class="empty-icon">&#11088;</div><div class="empty-title">Nothing saved yet</div><div class="empty-sub">Star projects from Alpha Tracker to pin them here.</div></div>
-      </div>
-
-      <!-- RADAR -->
-      <div class="page" id="pg-radar">
-        <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-          <div>
-            <div class="page-title">Mint Radar</div>
-            <div class="page-desc">On-chain tracker — detects new NFT mints live across ETH, BTC Ordinals &amp; Solana. Browser notifications when something fires.</div>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-secondary btn-sm" id="radarNotifBtn">&#128276; Enable Notifications</button>
-            <button class="btn btn-primary btn-sm" id="radarStartBtn">&#9654; Start Radar</button>
-          </div>
-        </div>
-
-        <!-- NOTIFICATION BANNER -->
-        <div class="notif-banner" id="radarNotifBanner">
-          <span style="font-size:16px;">&#128276;</span>
-          <div>
-            <div style="font-weight:700;color:var(--text);">Browser notifications not enabled</div>
-            <div style="color:var(--text3);font-size:11px;">Click "Enable Notifications" so Radar can alert you even when the tab is in the background.</div>
-          </div>
-        </div>
-
-        <div class="radar-grid">
-          <!-- LEFT — CONFIG -->
-          <div>
-            <!-- STATUS -->
-            <div class="radar-status" id="radarStatus">
-              <div class="radar-dot off" id="radarDot"></div>
-              <div>
-                <div class="radar-status-text" id="radarStatusText">Radar offline</div>
-                <div class="radar-status-sub" id="radarStatusSub">Start radar to begin scanning</div>
-              </div>
-            </div>
-
-            <!-- CHAIN SELECTOR -->
-            <div class="radar-panel" style="margin-bottom:14px;">
-              <h4>Chains to Watch</h4>
-              <div style="display:flex;flex-direction:column;gap:8px;">
-                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                  <input type="checkbox" id="watchEth" checked style="accent-color:var(--blue);width:15px;height:15px;"/>
-                  <span style="font-size:12.5px;font-weight:600;color:var(--blue);">&#926; Ethereum</span>
-                  <span style="font-size:10px;color:var(--text3);">Polls ETH RPC for Transfer(0x0→) events</span>
-                </label>
-                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                  <input type="checkbox" id="watchBtc" checked style="accent-color:var(--btc);width:15px;height:15px;"/>
-                  <span style="font-size:12.5px;font-weight:600;color:var(--btc);">&#8383; Ordinals</span>
-                  <span style="font-size:10px;color:var(--text3);">Polls Hiro API for new inscriptions</span>
-                </label>
-                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                  <input type="checkbox" id="watchSol" checked style="accent-color:#9945ff;width:15px;height:15px;"/>
-                  <span style="font-size:12.5px;font-weight:600;color:#9945ff;">&#9675; Solana</span>
-                  <span style="font-size:10px;color:var(--text3);">Polls Solana RPC for Metaplex mints</span>
-                </label>
-              </div>
-            </div>
-
-            <!-- WATCH LIST -->
-            <div class="radar-panel" style="margin-bottom:14px;">
-              <h4>Watch Specific Contracts / Collections</h4>
-              <div style="font-size:11px;color:var(--text3);margin-bottom:10px;">Add a contract address (ETH), collection slug (BTC), or program ID (SOL) to get targeted alerts.</div>
-              <div style="display:flex;gap:8px;margin-bottom:10px;">
-                <select id="radarAddChain" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;">
-                  <option value="ETH">ETH</option>
-                  <option value="BTC">BTC</option>
-                  <option value="SOL">SOL</option>
-                </select>
-                <input type="text" id="radarAddInput" placeholder="0x contract / slug / program ID" style="flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:11.5px;outline:none;"/>
-                <button class="btn btn-primary btn-sm" id="radarAddBtn">+ Add</button>
-              </div>
-              <div id="radarWatchList" style="display:flex;flex-wrap:wrap;gap:4px;min-height:24px;">
-                <span style="font-size:10.5px;color:var(--text3);padding:4px;">No specific targets — watching all new mints</span>
-              </div>
-            </div>
-
-            <!-- SCAN CONFIG -->
-            <div class="radar-panel">
-              <h4>Scan Settings</h4>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                <div class="lf" style="margin:0;"><label>Poll Interval (seconds)</label>
-                  <input type="number" id="radarInterval" value="15" min="5" max="120" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:12px;outline:none;"/>
-                </div>
-                <div class="lf" style="margin:0;"><label>Max Events Shown</label>
-                  <input type="number" id="radarMaxEvents" value="50" min="10" max="200" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:12px;outline:none;"/>
-                </div>
-                <div class="lf" style="margin:0;"><label>Min Mint Value (ETH)</label>
-                  <input type="number" id="radarMinVal" value="0" min="0" step="0.001" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:12px;outline:none;"/>
-                </div>
-                <div class="lf" style="margin:0;"><label>Alert Sound</label>
-                  <select id="radarSound" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;border-radius:var(--radius-sm);font-family:var(--font-b);font-size:12px;outline:none;">
-                    <option value="on">On</option>
-                    <option value="off">Off</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- RIGHT — LIVE FEED -->
-          <div>
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-              <div style="font-family:var(--font-d);font-size:13px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px;">
-                LIVE MINT FEED
-                <span style="font-size:9px;padding:2px 7px;background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.2);color:#06b6d4;border-radius:20px;" id="radarEventCount">0 events</span>
-              </div>
-              <div style="display:flex;gap:6px;">
-                <button class="btn btn-ghost btn-sm" id="radarFilterAll" style="font-size:10px;" data-filter="all">All</button>
-                <button class="btn btn-ghost btn-sm" id="radarFilterEth" style="font-size:10px;color:var(--blue);" data-filter="ETH">&#926; ETH</button>
-                <button class="btn btn-ghost btn-sm" id="radarFilterBtc" style="font-size:10px;color:var(--btc);" data-filter="BTC">&#8383; BTC</button>
-                <button class="btn btn-ghost btn-sm" id="radarFilterSol" style="font-size:10px;color:#9945ff;" data-filter="SOL">&#9675; SOL</button>
-                <button class="btn btn-ghost btn-sm" id="radarClearBtn" style="font-size:10px;">&#128465; Clear</button>
-              </div>
-            </div>
-
-            <!-- STATS ROW -->
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;">
-                <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;">Total Detected</div>
-                <div style="font-family:var(--font-d);font-size:20px;font-weight:800;color:var(--text);" id="rStatTotal">0</div>
-              </div>
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;">
-                <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;">ETH Mints</div>
-                <div style="font-family:var(--font-d);font-size:20px;font-weight:800;color:var(--blue);" id="rStatEth">0</div>
-              </div>
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;">
-                <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;">Inscriptions</div>
-                <div style="font-family:var(--font-d);font-size:20px;font-weight:800;color:var(--btc);" id="rStatBtc">0</div>
-              </div>
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;">
-                <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;">SOL Mints</div>
-                <div style="font-family:var(--font-d);font-size:20px;font-weight:800;color:#9945ff;" id="rStatSol">0</div>
-              </div>
-            </div>
-
-            <!-- EVENTS -->
-            <div id="radarFeed">
-              <div class="radar-empty"><div class="ei">&#128251;</div><div style="font-size:13px;font-weight:600;color:var(--text2);">Radar is offline</div><div style="font-size:11.5px;margin-top:4px;">Hit Start Radar to begin scanning all chains for new mints.</div></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
     </div><!-- /right-panel -->
   </div><!-- /content-area -->
+
 </div><!-- /main-wrap -->
-<!-- BOTTOM NAV -->
-<nav class="bottom-nav">
-  <button class="nav-item active" data-tab="tracker">
-    <div class="nav-icon" style="background:linear-gradient(135deg,#a855f7,#7c3aed)">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-    </div>
-    <span>Alpha</span>
-  </button>
-  <button class="nav-item" data-tab="bot">
-    <div class="nav-icon" style="background:#0a0a0a;border:1px solid rgba(255,255,255,0.15);">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-    </div>
-    <span>Bot</span>
-  </button>
-  <button class="nav-item" data-tab="radar">
-    <div class="nav-icon" style="background:linear-gradient(135deg,#06b6d4,#0891b2)">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
-    </div>
-    <span>Radar</span>
-  </button>
-  <button class="nav-item" data-tab="watchlist">
-    <div class="nav-icon" style="background:linear-gradient(135deg,#10d97a,#047857)">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-    </div>
-    <span>Saved</span>
-  </button>
-</nav>
+
 </div><!-- /app -->
 
 <!-- MINT MODAL -->
@@ -1006,7 +793,6 @@ function renderMkt(data){
 }
 
 /* X TWITTER EMBEDS */
-
 
 /* ETH + GAS */
 // loadEth delegates to unified loadPrices
@@ -1914,7 +1700,6 @@ $('radarClearBtn')?.addEventListener('click',()=>{RADAR.events=[];RADAR.stats={t
 $('radarNotifBtn')?.addEventListener('click',radarRequestNotif);
 if(Notification.permission==='granted')RADAR.notifGranted=true;
 updateNotifBanner();
-
 
 init();
 </script>
