@@ -253,87 +253,98 @@ async function fetchWithFallback(url, { parse = 'json', timeoutMs = 6500, direct
   throw new Error(lastError?.name === 'AbortError' ? 'request timed out' : (lastError?.message || 'Failed to fetch'));
 }
 
-async function resolveOpenSeaSlug(slug) {
-  let meta = null;
-  try {
-    setStatus('Loading OpenSea collection preview...');
-    const d = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + slug, { timeoutMs: 4500 });
-    if (d) {
-      meta = {
-        contract: d.contracts?.[0]?.address || null,
-        name: d.name || 'Collection',
-        image: d.image_url || '',
-        banner: d.banner_image_url || d.image_url || '',
-        twitterUrl: d.twitter_username ? 'https://x.com/' + d.twitter_username : '',
-        osUrl: 'https://opensea.io/collection/' + (d.collection || slug),
-        supply: d.total_supply ? parseInt(d.total_supply) : 0,
-        minted: 0,
-        floor: 0,
-        source: 'OpenSea'
-      };
-    }
-  } catch(e) {
-    log('OpenSea API failed: ' + e.message + ' - trying Reservoir', 'warn');
-  }
-
-  if (meta?.contract) return meta;
-
-  try {
-    setStatus('OpenSea API is blocked. Scanning OpenSea page mirror...');
-    const page = await fetchWithFallback('https://r.jina.ai/https://opensea.io/collection/' + slug, {
-      parse: 'text',
-      timeoutMs: 9000,
-      direct: true
-    });
-    const contract = page.match(/0x[a-fA-F0-9]{40}/)?.[0] || null;
-    if (contract) {
-      const title = page.match(/^Title:\s*(.+)$/m)?.[1]?.replace(/ - Collection \| OpenSea$/, '') || 'Collection';
+/* ── Reservoir — primary source, has images + supply + floor ── */
+async function resolveReservoirSlug(slug) {
+  for (const ver of ['v7', 'v6']) {
+    try {
+      const url = 'https://api.reservoir.tools/collections/' + ver + '?slug=' + encodeURIComponent(slug);
+      const d = await fetchWithFallback(url, { timeoutMs: 6000 });
+      const col = d.collections?.[0];
+      if (!col) continue;
+      const rawName = (col.name || 'Collection').replace(/\s+\d+\.?\d*\s*(ETH|eth|Ξ)/g, '').trim();
       return {
-        contract,
-        name: title,
-        image: '',
-        banner: '',
-        twitterUrl: '',
-        osUrl: 'https://opensea.io/collection/' + slug,
-        supply: 0,
-        minted: 0,
-        floor: 0,
-        source: 'OpenSea page mirror'
+        contract:   col.primaryContract || col.contract || null,
+        name:       rawName || 'Collection',
+        image:      col.image || '',
+        banner:     col.bannerImageUrl || col.banner || col.image || '',
+        floor:      col.floorAsk?.price?.amount?.native || col.floorAsk?.price?.amount?.decimal || 0,
+        supply:     parseInt(col.tokenCount) || 0,
+        minted:     parseInt(col.mintedCount) || 0,
+        twitterUrl: col.twitterUsername ? 'https://x.com/' + col.twitterUsername : '',
+        osUrl:      'https://opensea.io/collection/' + slug,
+        source:     'Reservoir'
       };
-    }
-  } catch(e) {
-    log('OpenSea page mirror failed: ' + e.message, 'warn');
+    } catch(e) {}
   }
-
-  try {
-    setStatus('Trying Reservoir mirror...');
-    const d = await resolveReservoirSlug(slug);
-    if (d?.contract) return { ...d, source: 'Reservoir mirror' };
-  } catch(e) {
-    log('Reservoir mirror failed: ' + e.message, 'warn');
-  }
-
-  return meta;
+  return null;
 }
 
-async function resolveReservoirSlug(slug) {
-  const url = 'https://api.reservoir.tools/collections/v6?slug=' + encodeURIComponent(slug);
-  const d = await fetchWithFallback(url, { timeoutMs: 6000 });
-  const col = d.collections?.[0];
-  if (!col) return null;
-  const rawName = (col.name || 'Collection').replace(/\s+\d+\.?\d*\s*(ETH|eth|Ξ)/g, '').trim();
-  return {
-    contract: col.primaryContract || col.contract || null,
-    name: rawName || 'Collection',
-    image: col.image || '',
-    banner: col.bannerImageUrl || col.banner || col.image || '',
-    floor: col.floorAsk?.price?.amount?.native || col.floorAsk?.price?.amount?.decimal || 0,
-    supply: parseInt(col.tokenCount) || 0,
-    minted: parseInt(col.mintedCount || col.primaryContract && 0) || 0,
-    twitterUrl: col.twitterUsername ? 'https://x.com/' + col.twitterUsername : '',
-    osUrl: 'https://opensea.io/collection/' + slug,
-    source: 'Reservoir'
-  };
+/* ── OpenSea API — secondary, fetches stats for accurate supply ── */
+async function resolveOpenSeaSlug(slug) {
+  // 1. Try Reservoir first — best images + supply data
+  try {
+    setStatus('Fetching collection data...');
+    const res = await resolveReservoirSlug(slug);
+    if (res?.contract) {
+      log('Resolved via Reservoir', 'ok');
+      return res;
+    }
+  } catch(e) {
+    log('Reservoir failed: ' + e.message, 'warn');
+  }
+
+  // 2. OpenSea API with CORS proxies
+  try {
+    setStatus('Trying OpenSea API...');
+    const d = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + slug, { timeoutMs: 6000 });
+    if (d?.contracts?.length || d?.name) {
+      const collectionId = d.collection || slug;
+      let floor = 0, minted = 0;
+      // Fetch stats for real supply numbers
+      try {
+        const sd = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + collectionId + '/stats', { timeoutMs: 5000 });
+        if (sd?.total) { floor = sd.total.floor_price || 0; minted = sd.total.count || 0; }
+      } catch(e) {}
+      const rawName = (d.name || 'Collection').replace(/\s+\d+\.?\d*\s*(ETH|eth|Ξ)/g, '').trim();
+      return {
+        contract:   d.contracts?.[0]?.address || null,
+        name:       rawName || 'Collection',
+        image:      d.image_url || '',
+        banner:     d.banner_image_url || d.image_url || '',
+        twitterUrl: d.twitter_username ? 'https://x.com/' + d.twitter_username : '',
+        osUrl:      'https://opensea.io/collection/' + collectionId,
+        supply:     d.total_supply ? parseInt(d.total_supply) : 0,
+        minted:     minted,
+        floor:      floor,
+        source:     'OpenSea'
+      };
+    }
+  } catch(e) {
+    log('OpenSea API failed: ' + e.message, 'warn');
+  }
+
+  // 3. Jina page mirror — last resort, contract only, no images
+  try {
+    setStatus('Scanning page mirror...');
+    const page = await fetchWithFallback('https://r.jina.ai/https://opensea.io/collection/' + slug, {
+      parse: 'text', timeoutMs: 9000, direct: true
+    });
+    const match = [...(page.matchAll(/0x[a-fA-F0-9]{40}/g))];
+    const contract = match[0]?.[0] || null;
+    if (contract) {
+      const title = page.match(/^Title:\s*(.+)$/m)?.[1]?.replace(/ - Collection \| OpenSea$/, '').replace(/\s+\d+\.?\d*\s*(ETH|eth|Ξ)/g, '').trim() || 'Collection';
+      log('Contract found via page mirror — no images available', 'warn');
+      return {
+        contract, name: title, image: '', banner: '', twitterUrl: '',
+        osUrl: 'https://opensea.io/collection/' + slug,
+        supply: 0, minted: 0, floor: 0, source: 'page mirror'
+      };
+    }
+  } catch(e) {
+    log('Page mirror failed: ' + e.message, 'warn');
+  }
+
+  return null;
 }
 
 async function fetchCollection() {
