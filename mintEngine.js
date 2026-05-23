@@ -112,8 +112,23 @@ export async function executeMint(contractAddr, signer, qty, log, options = {}) 
   const {
     maxGas    = 50,
     tip       = 2,
-    manualPrice = null   // ETH as number e.g. 0.08
+    manualPrice = null
   } = options;
+
+  /* ── NETWORK CHECK — must be Ethereum Mainnet (chainId 1) ── */
+  try {
+    const network = await signer.provider.getNetwork();
+    if (network.chainId !== 1) {
+      throw new Error(
+        `Wrong network: connected to "${network.name}" (chain ${network.chainId}). ` +
+        `Switch MetaMask to Ethereum Mainnet and try again.`
+      );
+    }
+    log("Network: Ethereum Mainnet ✓");
+  } catch(e) {
+    if (e.message.includes("Wrong network")) throw e;
+    log("Could not verify network — proceeding with caution", "warn");
+  }
 
   const maxFeePerGas         = ethers.utils.parseUnits(String(maxGas), "gwei");
   const maxPriorityFeePerGas = ethers.utils.parseUnits(String(tip), "gwei");
@@ -232,4 +247,23 @@ export async function executeMint(contractAddr, signer, qty, log, options = {}) 
   }
 
   throw new Error("All mint attempts failed");
+}
+
+/* ══════════════════════════════════════
+   PRIVATE KEY SIGNER
+   Creates a signer from a raw private key
+   WARNING: Never share your private key
+══════════════════════════════════════ */
+export function createPrivateKeySigner(privateKey, rpcUrl = 'https://ethereum.publicnode.com') {
+  if (!privateKey || privateKey.trim() === '') throw new Error('Private key is empty');
+  const pk = privateKey.trim().startsWith('0x') ? privateKey.trim() : '0x' + privateKey.trim();
+  if (pk.length !== 66) throw new Error('Invalid private key length');
+  const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+  const wallet = new ethers.Wallet(pk, provider);
+  return wallet;
+}
+
+export async function getPrivateKeyAddress(privateKey) {
+  const signer = createPrivateKeySigner(privateKey);
+  return await signer.getAddress();
 }
