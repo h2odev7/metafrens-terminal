@@ -18,8 +18,8 @@
   --r:10px;--r-sm:6px;
 }
 
-/* Dark mode — toggled via .dark on <body> */
-body.dark{
+/* Dark mode — toggled via .dark on <html> and <body> */
+html.dark,body.dark{
   --bg:#000000;
   --card:#0a0a0a;
   --card2:#111111;
@@ -32,10 +32,19 @@ body.dark{
 /* Smooth transition on EVERYTHING */
 *,*::before,*::after{
   box-sizing:border-box;margin:0;padding:0;
+}
+*:not(html):not(body){
   transition:background-color .2s,border-color .2s,color .15s;
 }
 html,body{
+  transition:background-color .25s;
+}
+html{
   min-height:100%;
+  background:var(--bg);
+}
+body{
+  min-height:100vh;
   background:var(--bg);
   color:var(--t0);
   font-family:var(--fi);
