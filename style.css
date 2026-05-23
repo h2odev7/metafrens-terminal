@@ -1,962 +1,406 @@
-/**
- * app.js - UI logic only
- * Handles: wallet, prices, URL parsing, collection fetching,
- * task queue, sniper, theme toggle
- */
-
-'use strict';
-
-import { executeMint, detectPrice, createPrivateKeySigner, getPrivateKeyAddress } from './mintEngine.js';
-
-const $ = id => document.getElementById(id);
-
-const S = {
-  provider: null, signer: null, addr: null,
-  ethPrice: 0, gasPrice: 0,
-  tasks: [], mode: 'manual', pending: null,
-  pkMode: false  // true when using private key instead of MetaMask
-};
-
-const COL = {
-  contract: null, name: '', price: 0,
-  supply: 0, minted: 0, slug: '', platform: '',
-  phases: [], soldOut: false
-};
-
-let _prevEth = 0;
-
-async function loadPrices() {
-  try {
-    const c = JSON.parse(localStorage.getItem('mb_p') || '{}');
-    if (c.eth) _setEth(c.eth);
-  } catch(e) {}
-  try {
-    const r = await Promise.race([
-      fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'),
-      new Promise((_, rej) => setTimeout(rej, 5000))
-    ]);
-    const d = await r.json();
-    _setEth(d.ethereum.usd);
-    localStorage.setItem('mb_p', JSON.stringify({ eth: d.ethereum.usd }));
-  } catch(e) {
-    try {
-      const r = await fetch('https://api.coincap.io/v2/assets/ethereum');
-      const d = await r.json();
-      _setEth(parseFloat(d.data.priceUsd));
-    } catch(e2) {}
-  }
-}
-
-function _setEth(p) {
-  const el = $('ethP');
-  if (!el || !p) return;
-  const up = p > _prevEth;
-  el.textContent = '$' + p.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  if (_prevEth && p !== _prevEth) {
-    el.className = 'tb-v ' + (up ? 'up' : 'down');
-    setTimeout(() => el.className = 'tb-v', 700);
-  }
-  _prevEth = p;
-  S.ethPrice = p;
-}
-
-async function loadGas() {
-  const rpcs = [
-    'https://ethereum.publicnode.com',
-    'https://rpc.ankr.com/eth',
-    'https://cloudflare-eth.com'
-  ];
-
-  for (const url of rpcs) {
-    try {
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_gasPrice', params: [], id: 1 })
-      });
-      const d = await r.json();
-      if (d.result) {
-        const g = parseInt(d.result, 16) / 1e9;
-        S.gasPrice = g;
-        $('gasP').textContent = g >= 10 ? Math.round(g) : g.toFixed(1).replace(/\.0$/, '');
-        return;
-      }
-    } catch(e) {}
-  }
-  $('gasP').textContent = '--';
-}
-
-function log(msg, t = '') {
-  const d = document.createElement('div');
-  d.className = 'le ' + t;
-  d.innerHTML = '<span class="ts">[' + new Date().toLocaleTimeString('en-US', { hour12: false }) + ']</span>' + msg;
-  const l = $('botLog');
-  l.insertBefore(d, l.firstChild);
-  while (l.children.length > 80) l.removeChild(l.lastChild);
-}
-
-function setStatus(msg, t = '') {
-  const el = $('statusMsg');
-  el.textContent = msg;
-  el.className = 'status-msg ' + t;
-}
-
-window.connectWallet = async function({ forcePicker = false } = {}) {
-  if (!window.ethereum) { alert('Install MetaMask'); return; }
-  try {
-    if (forcePicker && window.ethereum.request) {
-      try {
-        await window.ethereum.request({
-          method: 'wallet_requestPermissions',
-          params: [{ eth_accounts: {} }]
-        });
-      } catch(e) {
-        if (e.code === 4001) throw e;
-      }
-    }
-
-    S.provider = new ethers.providers.Web3Provider(window.ethereum);
-    await S.provider.send('eth_requestAccounts', []);
-    S.signer = S.provider.getSigner();
-    S.addr = await S.signer.getAddress();
-    setWalletConnected(S.addr);
-    if ($('mAddr')) $('mAddr').value = S.addr;
-    log('Connected: ' + S.addr, 'ok');
-    setStatus('Wallet connected.', 'ok');
-  } catch(e) {
-    log('Wallet error: ' + (e.message || e), 'err');
-    setStatus(e.code === 4001 ? 'Wallet connection cancelled.' : 'Wallet connection failed.', 'err');
-  }
-};
-
-function setWalletConnected(addr) {
-  const btn = $('walletBtn');
-  if (!btn) return;
-  btn.textContent = addr.slice(0, 6) + '...' + addr.slice(-4);
-  btn.classList.add('connected');
-  btn.disabled = false;
-  btn.title = 'Click to choose a different MetaMask account';
-  btn.onclick = () => window.connectWallet({ forcePicker: true });
-  if ($('disconnectBtn')) $('disconnectBtn').hidden = false;
-}
-
-window.disconnectWallet = async function() {
-  try {
-    await window.ethereum?.request?.({
-      method: 'wallet_revokePermissions',
-      params: [{ eth_accounts: {} }]
-    });
-  } catch(e) {}
-
-  S.provider = null;
-  S.signer = null;
-  S.addr = null;
-  const btn = $('walletBtn');
-  if (btn) {
-    btn.textContent = 'Connect Wallet';
-    btn.classList.remove('connected');
-    btn.disabled = false;
-    btn.title = '';
-    btn.onclick = () => window.connectWallet();
-  }
-  if ($('disconnectBtn')) $('disconnectBtn').hidden = true;
-  if ($('mAddr')) $('mAddr').value = '';
-  setStatus('Wallet disconnected. Click Connect Wallet to choose an account.', 'ok');
-  log('Wallet disconnected', 'info');
-};
-
-if (window.ethereum) {
-  window.ethereum.on?.('accountsChanged', accounts => {
-    if (accounts?.length) {
-      S.addr = accounts[0];
-      S.provider = new ethers.providers.Web3Provider(window.ethereum);
-      S.signer = S.provider.getSigner();
-      setWalletConnected(S.addr);
-      if ($('mAddr')) $('mAddr').value = S.addr;
-      log('Wallet switched: ' + S.addr, 'info');
-    } else {
-      window.disconnectWallet();
-    }
-  });
-}
-
-async function ensureSignerMatches(addr) {
-  if (!S.signer) {
-    await window.connectWallet();
-  }
-  if (!S.signer) return false;
-
-  const signerAddr = (await S.signer.getAddress()).toLowerCase();
-  if (addr && addr.toLowerCase() !== signerAddr) {
-    setStatus('MetaMask is connected to a different account. Click the connected wallet button to switch accounts.', 'err');
-    log('Wallet mismatch: field has ' + addr + ', MetaMask has ' + signerAddr, 'warn');
-    return false;
-  }
-  if ($('mAddr')) $('mAddr').value = await S.signer.getAddress();
-  return true;
-}
-
-function parseUrl(raw) {
-  raw = raw.trim();
-  raw = raw.replace(/\/(overview|items|activity|offers|analytics|traits|holders|mint)(\?.*)?$/, '');
-  if (raw.match(/^0x[a-fA-F0-9]{40}$/)) return { type: 'contract', value: raw, platform: 'direct' };
-
-  const maps = [
-    [/opensea\.io\/collection\/([^/?#\s]+)/, 'opensea', 'slug'],
-    [/opensea\.io\/assets\/ethereum\/(0x[a-fA-F0-9]{40})/, 'opensea', 'contract'],
-    [/zora\.co\/collect\/(?:zora|eth):(0x[a-fA-F0-9]{40})/, 'zora', 'contract'],
-    [/mint\.fun\/(0x[a-fA-F0-9]{40})/, 'mintfun', 'contract'],
-    [/foundation\.app\/@[^/]+\/([^/?#\s]+)/, 'foundation', 'slug'],
-    [/app\.manifold\.xyz\/c\/([^/?#\s]+)/, 'manifold', 'slug'],
-    [/manifold\.gallery\/collection\/([^/?#\s]+)/, 'manifold', 'slug'],
-    [/nft\.coinbase\.com\/collection\/ethereum\/(0x[a-fA-F0-9]{40})/, 'coinbase', 'contract'],
-    [/rarible\.com\/collection\/(0x[a-fA-F0-9]{40})/, 'rarible', 'contract'],
-  ];
-
-  for (const [re, platform, type] of maps) {
-    const m = raw.match(re);
-    if (m) return { type, value: m[1], platform };
-  }
-
-  if (raw.length > 5 && !raw.includes(' ')) return { type: 'slug', value: raw, platform: 'opensea' };
-  return null;
-}
-
-$('fetchBtn').addEventListener('click', fetchCollection);
-$('urlIn').addEventListener('keydown', e => { if (e.key === 'Enter') fetchCollection(); });
-
-async function fetchWithTimeout(url, options = {}, timeoutMs = 6500) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function fetchWithFallback(url, { parse = 'json', timeoutMs = 6500, direct = true } = {}) {
-  const proxies = [
-    ...(direct ? [''] : []),
-    'https://corsproxy.io/?url=',
-    'https://api.allorigins.win/raw?url='
-  ];
-  let lastError = null;
-  for (const p of proxies) {
-    try {
-      const r = await fetchWithTimeout(p ? p + encodeURIComponent(url) : url, {}, timeoutMs);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return parse === 'text' ? await r.text() : await r.json();
-    } catch(e) {
-      lastError = e;
-    }
-  }
-  throw new Error(lastError?.name === 'AbortError' ? 'request timed out' : (lastError?.message || 'Failed to fetch'));
-}
-
-/* ── Reservoir — primary source, has images + supply + floor ── */
-async function resolveReservoirSlug(slug) {
-  for (const ver of ['v7', 'v6']) {
-    try {
-      const url = 'https://api.reservoir.tools/collections/' + ver + '?slug=' + encodeURIComponent(slug);
-      const d = await fetchWithFallback(url, { timeoutMs: 6000 });
-      const col = d.collections?.[0];
-      if (!col) continue;
-      const rawName = (col.name || 'Collection').replace(/\s+\d+\.?\d*\s*(ETH|eth|Ξ)/g, '').trim();
-      return {
-        contract:   col.primaryContract || col.contract || null,
-        name:       rawName || 'Collection',
-        image:      col.image || '',
-        banner:     col.bannerImageUrl || col.banner || col.image || '',
-        floor:      col.floorAsk?.price?.amount?.native || col.floorAsk?.price?.amount?.decimal || 0,
-        supply:     parseInt(col.tokenCount) || 0,
-        minted:     parseInt(col.mintedCount) || 0,
-        twitterUrl: col.twitterUsername ? 'https://x.com/' + col.twitterUsername : '',
-        osUrl:      'https://opensea.io/collection/' + slug,
-        source:     'Reservoir'
-      };
-    } catch(e) {}
-  }
-  return null;
-}
-
-/* ── OpenSea API — secondary, fetches stats for accurate supply ── */
-async function resolveOpenSeaSlug(slug) {
-  // 1. Try Reservoir first — best images + supply data
-  try {
-    setStatus('Fetching collection data...');
-    const res = await resolveReservoirSlug(slug);
-    if (res?.contract) {
-      log('Resolved via Reservoir', 'ok');
-      return res;
-    }
-  } catch(e) {
-    log('Reservoir failed: ' + e.message, 'warn');
-  }
-
-  // 2. OpenSea API with CORS proxies
-  try {
-    setStatus('Trying OpenSea API...');
-    const d = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + slug, { timeoutMs: 6000 });
-    if (d?.contracts?.length || d?.name) {
-      const collectionId = d.collection || slug;
-      let floor = 0, minted = 0;
-      // Fetch stats for real supply numbers
-      try {
-        const sd = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + collectionId + '/stats', { timeoutMs: 5000 });
-        if (sd?.total) { floor = sd.total.floor_price || 0; minted = sd.total.count || 0; }
-      } catch(e) {}
-      const rawName = (d.name || 'Collection').replace(/\s+\d+\.?\d*\s*(ETH|eth|Ξ)/g, '').trim();
-      return {
-        contract:   d.contracts?.[0]?.address || null,
-        name:       rawName || 'Collection',
-        image:      d.image_url || '',
-        banner:     d.banner_image_url || d.image_url || '',
-        twitterUrl: d.twitter_username ? 'https://x.com/' + d.twitter_username : '',
-        osUrl:      'https://opensea.io/collection/' + collectionId,
-        supply:     d.total_supply ? parseInt(d.total_supply) : 0,
-        minted:     minted,
-        floor:      floor,
-        source:     'OpenSea'
-      };
-    }
-  } catch(e) {
-    log('OpenSea API failed: ' + e.message, 'warn');
-  }
-
-  // 3. Jina page mirror — last resort, contract only, no images
-  try {
-    setStatus('Scanning page mirror...');
-    const page = await fetchWithFallback('https://r.jina.ai/https://opensea.io/collection/' + slug, {
-      parse: 'text', timeoutMs: 9000, direct: true
-    });
-    const match = [...(page.matchAll(/0x[a-fA-F0-9]{40}/g))];
-    const contract = match[0]?.[0] || null;
-    if (contract) {
-      const title = page.match(/^Title:\s*(.+)$/m)?.[1]?.replace(/ - Collection \| OpenSea$/, '').replace(/\s+\d+\.?\d*\s*(ETH|eth|Ξ)/g, '').trim() || 'Collection';
-      log('Contract found via page mirror — no images available', 'warn');
-      return {
-        contract, name: title, image: '', banner: '', twitterUrl: '',
-        osUrl: 'https://opensea.io/collection/' + slug,
-        supply: 0, minted: 0, floor: 0, source: 'page mirror'
-      };
-    }
-  } catch(e) {
-    log('Page mirror failed: ' + e.message, 'warn');
-  }
-
-  return null;
-}
-
-async function fetchCollection() {
-  const raw = $('urlIn').value.trim();
-  if (!raw) { setStatus('Paste a mint link or contract.', 'err'); return; }
-
-  const parsed = parseUrl(raw);
-  if (!parsed) { setStatus('Invalid link - try pasting the 0x address directly.', 'err'); return; }
-
-  setStatus('Resolving ETH collection...');
-  log('Resolving: ' + parsed.value);
-  $('colCard').classList.remove('show');
-
-  let contract = null, name = 'Collection';
-  let image = '', banner = '', twitterUrl = '', osUrl = '';
-  let supply = 0, minted = 0, floor = 0;
-
-  try {
-    if (parsed.type === 'contract') contract = parsed.value;
-
-    if (!contract && parsed.type === 'slug') {
-      const d = await resolveOpenSeaSlug(parsed.value);
-      if (d?.contract) {
-        contract = d.contract;
-        name = d.name || name;
-        image = d.image || '';
-        banner = d.banner || image;
-        floor = d.floor || 0;
-        supply = d.supply || 0;
-        minted = d.minted || 0;
-        twitterUrl = d.twitterUrl || '';
-        osUrl = d.osUrl || 'https://opensea.io/collection/' + parsed.value;
-        log('Resolved via ' + (d.source || 'OpenSea'), 'ok');
-      }
-    }
-
-    if (!contract && parsed.type === 'slug') {
-      try {
-        const d = await resolveReservoirSlug(parsed.value);
-        if (d?.contract) {
-          contract = d.contract;
-          name = d.name || name;
-          image = d.image || '';
-          banner = d.banner || image;
-          floor = d.floor || 0;
-          supply = d.supply || 0;
-          minted = d.minted || 0;
-          twitterUrl = d.twitterUrl || '';
-          osUrl = d.osUrl || 'https://opensea.io/collection/' + parsed.value;
-          log('Resolved via Reservoir fallback', 'ok');
-        }
-      } catch(e) { log('Reservoir fallback failed: ' + e.message, 'warn'); }
-    }
-
-    if (!contract?.match(/^0x[a-fA-F0-9]{40}$/)) {
-      setStatus('Could not resolve this OpenSea collection automatically. Paste the 0x ETH contract address instead.', 'err');
-      return;
-    }
-
-    // On-chain reads — only override API data if chain returns higher values
-    const apiMinted = minted;
-    const apiSupply = supply;
-    try {
-      const provider = window.ethereum
-        ? new ethers.providers.Web3Provider(window.ethereum)
-        : new ethers.providers.JsonRpcProvider('https://ethereum.publicnode.com');
-      const abi = [
-        'function name() view returns (string)',
-        'function totalSupply() view returns (uint256)',
-        'function maxSupply() view returns (uint256)',
-      ];
-      const con = new ethers.Contract(contract, abi, provider);
-      try { const n = await con.name(); if (n && n.length > 0) name = n; } catch(e) {}
-      try {
-        const ts = (await con.totalSupply()).toNumber();
-        // Only use on-chain value if it's credible (> 0 and close to API value)
-        if (ts > 0) minted = ts;
-      } catch(e) {}
-      try {
-        const ms = (await con.maxSupply()).toNumber();
-        if (ms > 0) supply = ms;
-      } catch(e) {}
-    } catch(e) {}
-
-    // If on-chain returned 0 but API had real data, trust the API
-    if (minted === 0 && apiMinted > 0) minted = apiMinted;
-    if (supply === 0 && apiSupply > 0) supply = apiSupply;
-
-    COL.minted = minted > 0 ? minted : 0;
-    COL.supply = supply > 0 ? supply : 0;
-    COL.contract = contract;
-    COL.name = name;
-    COL.price = floor;
-    COL.slug = parsed.value;
-    COL.platform = parsed.type === 'slug' ? 'opensea' : parsed.platform;
-
-    renderColCard({ name, image, banner, contract, supply, minted, floor, twitterUrl, osUrl });
-    setStatus('');
-
-    // Fetch phases and detect price in parallel
-    const [phases, detectedPrice] = await Promise.all([
-      parsed.type === 'slug' ? fetchMintPhases(parsed.value).catch(() => []) : Promise.resolve([]),
-      (async () => {
-        try {
-          const provider = window.ethereum
-            ? new ethers.providers.Web3Provider(window.ethereum)
-            : new ethers.providers.JsonRpcProvider('https://ethereum.publicnode.com');
-          return await detectPrice(contract, provider);
-        } catch(e) { return null; }
-      })()
-    ]);
-
-    COL.phases = phases;
-
-    if (detectedPrice) {
-      COL.price = parseFloat(detectedPrice);
-      log('Price detected: ' + detectedPrice + ' ETH', 'ok');
-    } else if (floor > 0) {
-      COL.price = floor;
-      log('Price from API: ' + floor.toFixed(4) + ' ETH', 'info');
-    } else {
-      log('Price not auto-detected — enter manually', 'warn');
-    }
-
-    // Render phases with full data
-    renderPhases(phases, COL.supply, COL.minted, detectedPrice);
-
-    // Sold out banner
-    if (COL.soldOut) {
-      setStatus('⚠️ This collection is SOLD OUT (' + minted.toLocaleString() + '/' + supply.toLocaleString() + ' minted)', 'warn');
-      log('SOLD OUT: ' + name, 'warn');
-    }
-
-    $('limitNote').classList.remove('show');
-    if (COL.supply > 0) {
-      $('limitNote').classList.add('show');
-      const remaining = Math.max(0, COL.supply - COL.minted);
-      $('limitText').textContent = COL.supply.toLocaleString() + ' total supply · ' + remaining.toLocaleString() + ' remaining';
-    }
-    log('Loaded: ' + name + ' (' + contract.slice(0, 10) + '...) via ' + COL.platform, 'ok');
-  } catch(e) {
-    setStatus('Error: ' + e.message, 'err');
-    log(e.message, 'err');
-  }
-}
-
-
 /* ══════════════════════════════════════
-   FETCH MINT PHASES from OpenSea
+   METABOT — style.css
+   Light mode default · .dark = dark mode
 ══════════════════════════════════════ */
-async function fetchMintPhases(slug) {
-  try {
-    const d = await fetchWithFallback(
-      'https://api.opensea.io/api/v2/collections/' + slug + '/mint_stages',
-      { timeoutMs: 5000 }
-    );
-    if (d?.mint_stages?.length) return d.mint_stages;
-  } catch(e) {}
 
-  // Fallback: try Reservoir saleConfig
-  try {
-    const d = await fetchWithFallback(
-      'https://api.reservoir.tools/collections/v7?slug=' + encodeURIComponent(slug),
-      { timeoutMs: 5000 }
-    );
-    const col = d?.collections?.[0];
-    if (col?.saleConfig) {
-      const cfg = col.saleConfig;
-      return [{
-        stage: 'public-sale',
-        price: col.floorAsk?.price?.amount?.native || 0,
-        start_time: cfg.publicSaleStart ? new Date(cfg.publicSaleStart * 1000).toISOString() : null,
-        end_time: cfg.publicSaleEnd ? new Date(cfg.publicSaleEnd * 1000).toISOString() : null,
-        max_per_wallet: cfg.maxSalePurchasePerAddress || null,
-      }];
-    }
-  } catch(e) {}
-  return [];
+:root{
+  /* Light mode — default */
+  --bg:#f2f2f6;
+  --card:#ffffff;
+  --card2:#eaeaf0;
+  --b0:rgba(0,0,0,.07);
+  --b1:rgba(0,0,0,.12);
+  --acc:#7c2fd4;--acc2:#9d50e8;
+  --acc-glow:rgba(124,47,212,.12);
+  --ok:#059669;--err:#dc2626;--warn:#d97706;
+  --t0:#0a0a14;--t1:#4a4a6a;--t2:#9090b0;
+  --fd:"Syne",sans-serif;--fi:"Inter",sans-serif;
+  --r:10px;--r-sm:6px;
 }
 
-function fmtPhaseTime(isoStr) {
-  if (!isoStr) return null;
-  const d = new Date(isoStr);
-  const now = new Date();
-  const diff = d - now;
-  if (diff <= 0) return null; // already started
-  const h = Math.floor(diff / 36e5);
-  const m = Math.floor((diff % 36e5) / 6e4);
-  if (h > 48) return 'Starts in ' + Math.floor(h/24) + 'd ' + (h%24) + 'h';
-  if (h > 0)  return 'Starts in ' + h + 'h ' + m + 'm';
-  return 'Starts in ' + m + 'm';
+/* Dark mode — toggled via .dark on <html> and <body> */
+html.dark,body.dark{
+  --bg:#000000;
+  --card:#0a0a0a;
+  --card2:#111111;
+  --b0:rgba(255,255,255,.05);
+  --b1:rgba(255,255,255,.09);
+  --ok:#10b981;--err:#ef4444;--warn:#f59e0b;
+  --t0:#f0f0f8;--t1:#7777aa;--t2:#3a3a55;
 }
 
-function renderPhases(phases, supply, minted, detectedPrice) {
-  const soldOut = supply > 0 && minted >= supply;
-  COL.soldOut = soldOut;
+/* Smooth transition on EVERYTHING */
+*,*::before,*::after{
+  box-sizing:border-box;margin:0;padding:0;
+}
+*:not(html):not(body){
+  transition:background-color .2s,border-color .2s,color .15s;
+}
+html,body{
+  transition:background-color .25s;
+}
+html{
+  min-height:100%;
+  background:var(--bg);
+}
+body{
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--t0);
+  font-family:var(--fi);
+  font-size:14px;
+}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--card2);}
 
-  // Disable mint button if sold out
-  const mintBtn = $('mintBtn');
-  if (mintBtn) {
-    mintBtn.disabled = soldOut;
-    mintBtn.title = soldOut ? 'This collection is sold out' : '';
-  }
+/* ── TOPBAR ── */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;height:48px;
+  background:var(--card);
+  border-bottom:1px solid var(--b0);
+  position:sticky;top:0;z-index:50;
+}
+.brand{display:flex;align-items:center;gap:8px;}
+.dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--ok);box-shadow:0 0 8px var(--ok);
+  animation:blink 2s infinite;
+  /* Don't transition dot — it animates */
+  transition:none;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.wm{
+  font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:.04em;
+  background:linear-gradient(90deg,var(--t0) 10%,var(--acc) 50%,var(--acc2) 65%,var(--t0) 90%);
+  background-size:200%;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:shimmer 4s linear infinite;
+}
+@keyframes shimmer{0%{background-position:200%}100%{background-position:-200%}}
+.tb-r{display:flex;align-items:center;gap:14px;}
+.tb-stat{text-align:right;}
+.tb-l{font-size:9px;color:var(--t2);letter-spacing:.1em;text-transform:uppercase;display:block;}
+.tb-v{font-size:12px;font-weight:600;color:var(--t0);}
+.tb-v.up{color:var(--ok);}
+.tb-v.down{color:var(--err);}
+.wb{
+  padding:7px 16px;background:transparent;color:var(--t0);
+  border:1px solid var(--b1);border-radius:var(--r-sm);
+  font-family:var(--fi);font-size:11px;font-weight:600;cursor:pointer;
+  white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;
+}
+.wb:hover{border-color:var(--acc);color:var(--acc);}
+.wb:disabled{cursor:default;opacity:1;}
+.wb.connected{border-color:rgba(16,185,129,.4);color:var(--ok);}
+.wb-disconnect{padding-inline:12px;color:var(--err);border-color:rgba(220,38,38,.25);}
+.wb-disconnect:hover{color:var(--err);border-color:rgba(220,38,38,.55);}
+.wb-pk{padding-inline:10px;font-size:13px;}
+.wb-pk:hover{border-color:rgba(220,38,38,.4);color:#ef4444;}
 
-  if (!phases || phases.length === 0) {
-    // Fallback single phase
-    renderPhase(detectedPrice || COL.price, supply, soldOut);
-    return;
-  }
+/* ── THEME TOGGLE ── */
+.theme-toggle{
+  position:fixed;bottom:24px;right:24px;z-index:100;
+  width:44px;height:44px;border-radius:50%;
+  background:var(--card);
+  border:1px solid var(--b1);
+  color:var(--t1);font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 16px rgba(0,0,0,.12);
+}
+.theme-toggle:hover{border-color:var(--acc);color:var(--acc);}
 
-  const html = phases.map((ph, i) => {
-    const price = ph.price != null ? parseFloat(ph.price) : (detectedPrice ? parseFloat(detectedPrice) : 0);
-    const startTime = fmtPhaseTime(ph.start_time);
-    const isLive = !startTime; // no countdown = already started
-    const isSoldOut = soldOut && isLive;
+/* ── PAGE LAYOUT ── */
+.page{max-width:1100px;margin:0 auto;padding:24px 24px 60px;}
 
-    let timerClass = isSoldOut ? 'sold-out' : isLive ? 'live' : 'soon';
-    let timerText  = isSoldOut ? 'SOLD OUT' : isLive ? 'LIVE' : startTime;
-
-    const stageName = (ph.stage || ph.name || (i === 0 ? 'PUBLIC MINT' : 'PHASE ' + (i+1)))
-      .replace(/-/g, ' ').toUpperCase();
-
-    return '<div class="phase' + (i === 0 ? ' selected' : '') + '" onclick="selectPhase(this,' + price + ',' + (ph.start_time ? JSON.stringify(ph.start_time) : 'null') + ')">' +
-      '<div class="phase-top">' +
-        '<span class="phase-name">' + stageName + '</span>' +
-        '<span class="phase-timer ' + timerClass + '">' + timerText + '</span>' +
-      '</div>' +
-      '<div class="phase-meta">' +
-        '<span class="phase-pill eth">PRICE · ' + (price > 0 ? price.toFixed(4) + ' Ξ' : 'FREE') + '</span>' +
-        '<span class="phase-pill">SUPPLY · ' + (supply > 0 ? supply.toLocaleString() : '—') + '</span>' +
-        (ph.max_per_wallet ? '<span class="phase-pill">MAX ' + ph.max_per_wallet + '/WALLET</span>' : '') +
-      '</div>' +
-    '</div>';
-  }).join('');
-
-  $('phaseList').innerHTML = html;
+.page-grid{
+  display:grid;
+  grid-template-columns:1fr 360px;
+  gap:22px;
+  align-items:start;
+}
+.col-main{min-width:0;}
+.col-side{
+  position:sticky;top:64px;
+  display:flex;flex-direction:column;gap:10px;
 }
 
-window.selectPhase = function(el, price, startTime) {
-  document.querySelectorAll('.phase').forEach(p => p.classList.remove('selected'));
-  el.classList.add('selected');
-  // Update price and scheduled time from this phase
-  COL.price = price;
-  if (startTime) {
-    const t = new Date(startTime);
-    if ($('mTime')) $('mTime').value = t.toISOString().slice(0, 16);
-    // Auto-switch to scheduled mode if phase hasn't started
-    if (t > new Date()) {
-      document.querySelectorAll('#modeBar .mode-tab').forEach(b => {
-        b.classList.toggle('on', b.dataset.mode === 'scheduled');
-      });
-      S.mode = 'scheduled';
-      $('schedRow').style.display = 'block';
-      $('modeNote').textContent = 'Scheduled for phase start time';
-      log('Phase start time set: ' + t.toLocaleString(), 'info');
-    }
-  }
-};
-
-function renderPhase(price, supply) {
-  const p = price > 0 ? parseFloat(price) : 0;
-  $('phaseList').innerHTML =
-    '<div class="phase selected">' +
-      '<div class="phase-top">' +
-        '<span class="phase-name">' + (p === 0 ? 'FREE MINT' : 'PUBLIC MINT') + '</span>' +
-        '<span class="phase-timer live">LIVE</span>' +
-      '</div>' +
-      '<div class="phase-meta">' +
-        '<span class="phase-pill eth">PRICE · ' + (p > 0 ? p.toFixed(4) + ' Ξ' : 'FREE') + '</span>' +
-        '<span class="phase-pill">SUPPLY · ' + (supply > 0 ? supply.toLocaleString() : '—') + '</span>' +
-      '</div>' +
-    '</div>';
+/* ── URL BAR ── */
+.url-bar{display:flex;gap:8px;margin-bottom:10px;}
+.url-in{
+  flex:1;background:var(--card);border:1px solid var(--b1);color:var(--t0);
+  padding:12px 16px;font-family:var(--fi);font-size:13px;
+  border-radius:var(--r);outline:none;
+  box-shadow:0 1px 4px rgba(0,0,0,.05);
 }
-
-function renderColCard({ name, image, banner, contract, supply, minted, floor, twitterUrl, osUrl }) {
-  $('colName').textContent = name;
-  $('colAddrText').textContent = contract.slice(0, 6) + '...' + contract.slice(-4).toUpperCase();
-  $('colAddr').href = 'https://etherscan.io/address/' + contract;
-
-  const bi = $('colBannerImg');
-  if (banner) { bi.src = banner; bi.style.display = 'block'; }
-  else { bi.removeAttribute('src'); bi.style.display = 'none'; }
-
-  const initial = (name || '?').charAt(0);
-  const thumbWrap = $('colThumbWrap');
-  thumbWrap.innerHTML = image
-    ? '<img src="' + image + '" class="col-thumb" alt=""/>'
-    : '<div class="col-thumb-ph">' + initial + '</div>';
-  const thumbImg = thumbWrap.querySelector('img');
-  if (thumbImg) {
-    thumbImg.onerror = () => {
-      thumbWrap.innerHTML = '<div class="col-thumb-ph">' + initial + '</div>';
-    };
-  }
-
-  const pct = supply > 0 ? Math.min(100, Math.round(minted / supply * 100)) : 0;
-  $('progressFill').style.width = pct + '%';
-  $('progressLabel').textContent = pct + '% minted';
-  $('progressVal').textContent = minted.toLocaleString() + (supply > 0 ? ' / ' + supply.toLocaleString() : '');
-
-  const links = [];
-  if (osUrl) links.push('<a class="col-link" href="' + osUrl + '" target="_blank" rel="noopener">OpenSea</a>');
-  if (twitterUrl) links.push('<a class="col-link" href="' + twitterUrl + '" target="_blank" rel="noopener">X</a>');
-  links.push('<a class="col-link" href="https://etherscan.io/address/' + contract + '" target="_blank" rel="noopener">Etherscan</a>');
-  $('colLinks').innerHTML = links.join('');
-
-  renderPhase(floor, supply);
-
-  $('colCard').classList.add('show');
+.url-in:focus{border-color:var(--acc);}
+.url-in::placeholder{color:var(--t2);}
+.url-btn{
+  min-width:70px;
+  padding:12px 18px;background:var(--acc);color:#fff;border:none;
+  border-radius:var(--r);font-family:var(--fi);font-size:14px;font-weight:700;
+  cursor:pointer;
 }
+.url-btn:hover{background:var(--acc2);}
+.url-hint{font-size:11px;color:var(--t2);margin-bottom:18px;}
+.url-hint span{color:var(--t1);}
+.url-hint .primary{color:var(--acc);font-weight:700;}
+.status-msg{font-size:11px;color:var(--t2);min-height:16px;margin-bottom:10px;}
+.status-msg.ok{color:var(--ok);}
+.status-msg.err{color:var(--err);}
 
-document.querySelectorAll('#modeBar .mode-tab').forEach(b => b.addEventListener('click', () => {
-  document.querySelectorAll('#modeBar .mode-tab').forEach(x => x.classList.remove('on'));
-  b.classList.add('on');
-  S.mode = b.dataset.mode;
-  const notes = {
-    manual: 'Opens wallet immediately - you sign to mint',
-    scheduled: 'Fires at the scheduled time',
-    sniper: 'Polls contract every 10s - fires the instant mint goes live'
-  };
-  $('modeNote').textContent = notes[S.mode];
-  $('schedRow').style.display = S.mode === 'scheduled' ? 'block' : 'none';
-}));
-
-function getOptions() {
-  return {
-    maxGas: parseInt($('mGas').value) || 50,
-    tip: parseFloat($('mTip').value) || 2,
-    manualPrice: COL.price || null
-  };
+/* ── COLLECTION CARD ── */
+.col-card{
+  background:var(--card);border:1px solid var(--b0);
+  border-radius:var(--r);overflow:hidden;margin-bottom:14px;
+  display:none;
 }
+.col-card.show{display:block;}
 
-function buildTask(addr) {
-  return {
-    id: Date.now(),
-    addr,
-    contract: COL.contract,
-    name: COL.name,
-    qty: parseInt($('mQty').value) || 1,
-    price: COL.price,
-    options: getOptions(),
-    mode: S.mode,
-    time: S.mode === 'scheduled' ? new Date($('mTime').value) : null,
-    status: 'ready'
-  };
+.col-banner{
+  height:120px;
+  background:linear-gradient(135deg,#2a0a5e,#4a1a9e,#2a0a5e);
+  position:relative;overflow:hidden;
 }
-
-$('mintBtn').addEventListener('click', async () => {
-  if (!COL.contract) { setStatus('Fetch a collection first.', 'err'); return; }
-  const addr = $('mAddr').value.trim() || S.addr;
-  if (!addr?.match(/^0x[a-fA-F0-9]{40}$/)) {
-    $('mAddr').focus();
-    setStatus('Enter your wallet address first.', 'err');
-    return;
-  }
-
-  const task = buildTask(addr);
-  if (S.mode === 'manual') {
-    if (await ensureSignerMatches(addr)) {
-      setStatus('Opening MetaMask for signature...');
-      try {
-        const result = await executeMint(task.contract, S.signer, task.qty, msg => log(msg, 'info'), task.options);
-        if (result.success) {
-          const link = '<a href="https://etherscan.io/tx/' + result.hash + '" target="_blank" rel="noopener">' + result.hash.slice(0,14) + '…</a>';
-          setStatus('Mint confirmed ✅', 'ok');
-          log('TX confirmed: ' + link + ' · Block ' + result.block, 'ok');
-        }
-      } catch(e) {
-        setStatus('Error: ' + e.message, 'err');
-        log(e.message, 'err');
-      }
-    } else {
-      setStatus('Connect MetaMask to sign this mint.', 'err');
-    }
-  } else if (S.mode === 'scheduled') {
-    task.status = 'waiting';
-    S.tasks.unshift(task);
-    renderTasks();
-    log('[SCHED] Queued for ' + new Date(task.time).toLocaleTimeString(), 'ok');
-  } else {
-    task.status = 'watching';
-    S.tasks.unshift(task);
-    renderTasks();
-    log('[SNIPER] Watching ' + COL.contract.slice(0, 12) + '...', 'ok');
-  }
-});
-
-$('queueBtn').addEventListener('click', async () => {
-  if (!COL.contract) { setStatus('Fetch a collection first.', 'err'); return; }
-  const addr = $('mAddr').value.trim() || S.addr;
-  if (!addr?.match(/^0x[a-fA-F0-9]{40}$/)) {
-    $('mAddr').focus();
-    setStatus('Enter your wallet address first.', 'err');
-    return;
-  }
-  const task = buildTask(addr);
-  if (S.signer && !(await ensureSignerMatches(addr))) return;
-  task.status = 'waiting';
-  S.tasks.unshift(task);
-  renderTasks();
-  log('Queued: ' + COL.name + ' x' + task.qty, 'ok');
-});
-
-function fmtCD(t) {
-  const d = new Date(t) - new Date();
-  if (d <= 0) return 'NOW';
-  const h = Math.floor(d / 36e5), m = Math.floor((d / 6e4) % 60);
-  return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
+.col-banner img{width:100%;height:100%;object-fit:cover;opacity:.75;}
+.col-banner-overlay{
+  position:absolute;inset:0;
+  background:linear-gradient(to right,rgba(0,0,0,.55) 0%,rgba(0,0,0,.1) 70%);
+  display:flex;align-items:center;padding:16px;gap:14px;
 }
-
-function persistTasks() {
-  try {
-    localStorage.setItem('mb_tasks', JSON.stringify(S.tasks));
-  } catch(e) {}
+.col-thumb{
+  width:62px;height:62px;border-radius:10px;
+  border:2px solid rgba(255,255,255,.25);
+  object-fit:cover;flex-shrink:0;
 }
-
-function renderTasks() {
-  persistTasks();
-  $('queueCnt').textContent = S.tasks.length + ' task' + (S.tasks.length !== 1 ? 's' : '');
-  const el = $('taskList');
-  if (!S.tasks.length) { $('queueSection').classList.remove('show'); return; }
-  $('queueSection').classList.add('show');
-
-  el.innerHTML = S.tasks.map(t =>
-    '<div class="task-card ' + t.status + '">' +
-      '<div class="tc-top">' +
-        '<div class="tc-addr">' + (t.name || t.contract.slice(0, 12) + '...') + ' x' + t.qty + '</div>' +
-        '<span class="tc-badge ' + t.status + '">' + t.status.toUpperCase() + '</span>' +
-      '</div>' +
-      '<div class="tc-meta">' +
-        '<div class="tc-m"><span class="lk">Mode</span><span class="lv">' + t.mode.toUpperCase() + '</span></div>' +
-        '<div class="tc-m"><span class="lk">Price</span><span class="lv">' + (t.price > 0 ? t.price.toFixed(4) + ' ETH' : 'FREE') + '</span></div>' +
-        '<div class="tc-m"><span class="lk">Gas</span><span class="lv">' + t.options.maxGas + '</span></div>' +
-        '<div class="tc-m"><span class="lk">' + (t.mode === 'scheduled' ? 'Fires In' : 'State') + '</span><span class="lv hi">' + (t.time ? fmtCD(t.time) : t.mode === 'sniper' ? 'WATCHING' : 'NOW') + '</span></div>' +
-      '</div>' +
-      '<div class="tc-acts">' +
-        '<button class="tc-btn fire" data-id="' + t.id + '" data-a="fire">Fire</button>' +
-        '<button class="tc-btn del" data-id="' + t.id + '" data-a="del">Remove</button>' +
-      '</div>' +
-    '</div>'
-  ).join('');
-
-  el.querySelectorAll('.tc-btn').forEach(b => b.addEventListener('click', async () => {
-    const t = S.tasks.find(x => x.id == b.dataset.id);
-    if (!t) return;
-    if (b.dataset.a === 'fire') {
-      t.status = 'ready';
-      if (S.signer) {
-        try { await executeMint(t.contract, S.signer, t.qty, msg => log(msg, 'info'), t.options); }
-        catch(e) { log(e.message, 'err'); }
-      } else {
-        openModal(t);
-      }
-    }
-    if (b.dataset.a === 'del') {
-      S.tasks = S.tasks.filter(x => x.id != b.dataset.id);
-      renderTasks();
-    }
-  }));
+.col-thumb-ph{
+  width:62px;height:62px;border-radius:10px;
+  border:2px solid rgba(255,255,255,.2);
+  background:rgba(0,0,0,.3);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--fd);font-size:22px;font-weight:800;color:rgba(255,255,255,.3);
 }
-
-function tickTasks() {
-  S.tasks.forEach(async t => {
-    if (t.mode === 'scheduled' && t.time && t.status === 'waiting' && new Date() >= t.time) {
-      t.status = 'ready';
-      log('SCHEDULED: ' + t.name, 'ok');
-      if (S.signer) {
-        try { await executeMint(t.contract, S.signer, t.qty, msg => log(msg, 'info'), t.options); }
-        catch(e) { log(e.message, 'err'); }
-      } else { openModal(t); }
-    }
-
-    if (t.mode === 'sniper' && t.status === 'watching') {
-      const now = Math.floor(Date.now() / 1000);
-      if (!t._p || now - t._p >= 10) {
-        t._p = now;
-        try {
-          const r = await fetch('https://ethereum.publicnode.com', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_call', params: [{ to: t.contract, data: '0x1249c58b' }, 'latest'], id: 1 })
-          });
-          const d = await r.json();
-          if (d.result !== undefined && !d.error) {
-            t.status = 'ready';
-            log('SNIPER HIT: ' + t.name + ' is LIVE', 'ok');
-            if (S.signer) {
-              try { await executeMint(t.contract, S.signer, t.qty, msg => log(msg, 'info'), t.options); }
-              catch(e) { log(e.message, 'err'); }
-            } else { openModal(t); }
-          }
-        } catch(e) {}
-        renderTasks();
-      }
-    }
-  });
-  renderTasks();
+.col-info{flex:1;min-width:0;}
+.col-name{
+  font-family:var(--fd);font-size:18px;font-weight:800;color:#fff;
+  text-shadow:0 1px 8px rgba(0,0,0,.9);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-
-function openModal(task) {
-  S.pending = task;
-  const tot = task.price * task.qty;
-  const vW = ethers.utils.parseEther(tot.toFixed(8)).toString();
-
-  $('txPreview').innerHTML = [
-    ['Collection', task.name || '-'],
-    ['Contract', task.contract.slice(0, 14) + '...' + task.contract.slice(-4)],
-    ['Qty / Value', task.qty + ' x ' + (task.price > 0 ? task.price.toFixed(4) : '0') + ' ETH = ' + tot.toFixed(4) + ' ETH' + (S.ethPrice ? ' (~$' + (tot * S.ethPrice).toFixed(2) + ')' : '')],
-    ['Gas', task.options.maxGas + ' gwei max - ' + task.options.tip + ' gwei tip'],
-  ].map(([k, v]) => '<div class="txr"><span class="txk">' + k + '</span><span class="txv">' + v + '</span></div>').join('');
-
-  $('modalDesc').textContent = S.signer
-    ? 'MetaMask connected - sign on-chain directly.'
-    : 'Connect MetaMask or use a wallet deep-link below.';
-  $('btnMM').style.display = S.signer ? 'block' : 'none';
-  $('btnRainbow').href = 'https://rnbwapp.com/wc?uri=' + encodeURIComponent('ethereum:' + task.contract + '@1?value=' + vW);
-  $('btnTrust').href = 'trust://send?address=' + task.contract + '&amount=' + tot + '&coin=60';
-  $('overlay').classList.add('open');
+.col-addr{
+  display:inline-flex;align-items:center;gap:5px;margin-top:5px;
+  padding:3px 9px;background:rgba(0,0,0,.5);border-radius:20px;
+  font-size:10px;font-family:var(--fi);font-weight:600;
+  color:rgba(255,255,255,.75);text-decoration:none;
 }
+.col-addr:hover{background:rgba(0,0,0,.75);}
 
-window.signWithMM = async function() {
-  const t = S.pending;
-  if (!t) return;
-  if (!(await ensureSignerMatches(t.addr))) return;
-  $('overlay').classList.remove('open');
-  setStatus('Minting...');
-  try {
-    const result = await executeMint(t.contract, S.signer, t.qty, msg => log(msg, 'info'), t.options);
-    setStatus(result.success ? 'Mint successful' : 'Done', 'ok');
-    S.tasks = S.tasks.filter(x => x.id !== t.id);
-    renderTasks();
-  } catch(e) {
-    setStatus('Error: ' + e.message, 'err');
-    log(e.message, 'err');
-  }
-};
+.col-body{padding:14px 16px;}
 
-$('modalClose').onclick = () => $('overlay').classList.remove('open');
-$('overlay').onclick = e => { if (e.target.id === 'overlay') $('overlay').classList.remove('open'); };
+/* Progress */
+.progress-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.progress-label{font-size:11px;color:var(--t1);}
+.progress-val{font-size:11px;font-weight:600;color:var(--t0);}
+.progress-bar{height:5px;background:var(--b0);border-radius:3px;overflow:hidden;margin-bottom:12px;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:3px;transition:width .4s ease;}
 
-window.toggleTheme = function() {
-  const isDark = document.documentElement.classList.toggle('dark');
-  document.body.classList.toggle('dark', isDark);
-  $('themeIcon').textContent = isDark ? '☽' : '○';
-  localStorage.setItem('mb_theme', isDark ? 'dark' : 'light');
-};
+/* Links */
+.col-links{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+.col-link{font-size:11px;color:var(--acc);text-decoration:none;}
+.col-link:hover{text-decoration:underline;color:var(--acc2);}
 
-(function() {
-  if (localStorage.getItem('mb_theme') === 'dark') {
-    document.documentElement.classList.add('dark');
-    document.body.classList.add('dark');
-    const ic = document.getElementById('themeIcon');
-    if (ic) ic.textContent = '☽';
-  }
-})();
-
-
-/* ══════════════════════════════════════
-   PRIVATE KEY MODE
-══════════════════════════════════════ */
-window.connectPrivateKey = async function() {
-  const pkInput = $('pkInput');
-  if (!pkInput) return;
-  const pk = pkInput.value.trim();
-  if (!pk) { setStatus('Enter a private key.', 'err'); return; }
-
-  try {
-    const wallet = createPrivateKeySigner(pk);
-    S.signer = wallet;
-    S.addr = await wallet.getAddress();
-    S.pkMode = true;
-
-    setStatus('Private key wallet connected.', 'ok');
-    pkInput.value = ''; // clear immediately for security
-    $('pkInput').placeholder = '✓ Key loaded — cleared for security';
-
-    setWalletConnected(S.addr);
-    if ($('mAddr')) $('mAddr').value = S.addr;
-    log('PK wallet: ' + S.addr, 'ok');
-
-    // Hide PK section
-    const pkSection = $('pkSection');
-    if (pkSection) pkSection.style.display = 'none';
-  } catch(e) {
-    setStatus('Invalid private key: ' + e.message, 'err');
-    log(e.message, 'err');
-  }
-};
-
-window.togglePKSection = function() {
-  const s = $('pkSection');
-  if (s) s.style.display = s.style.display === 'none' ? 'block' : 'none';
-};
-
-async function init() {
-  // Restore persisted tasks
-  try {
-    const saved = JSON.parse(localStorage.getItem('mb_tasks') || '[]');
-    if (Array.isArray(saved) && saved.length) {
-      // Restore time objects
-      S.tasks = saved.map(t => ({ ...t, time: t.time ? new Date(t.time) : null }));
-      renderTasks();
-      log('Restored ' + S.tasks.length + ' task(s) from previous session', 'info');
-    }
-  } catch(e) {}
-  setInterval(tickTasks, 1000);
-  setInterval(loadPrices, 30000);
-  setInterval(loadGas, 30000);
-  const t = new Date(Date.now() + 3600e3);
-  if ($('mTime')) $('mTime').value = t.toISOString().slice(0, 16);
-  await Promise.all([loadPrices(), loadGas()]);
+/* Phases */
+.phases-title{font-size:9px;font-weight:700;color:var(--t2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
+.phase{
+  background:var(--card2);border:1px solid var(--b0);
+  border-radius:var(--r-sm);padding:12px 14px;margin-bottom:8px;cursor:pointer;
 }
+.phase:hover{border-color:var(--b1);}
+.phase.selected{border-color:var(--acc);background:var(--acc-glow);}
+.phase-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.phase-name{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--t0);}
+.phase-timer{font-size:10px;padding:3px 8px;border-radius:20px;border:1px solid var(--b0);color:var(--t2);background:var(--bg);}
+.phase-timer.live{color:var(--ok);border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.08);}
+.phase-timer.soon{color:var(--warn);border-color:rgba(217,119,6,.25);}
+.phase-timer.sold-out{color:var(--err);border-color:rgba(220,38,38,.25);background:rgba(220,38,38,.06);}
+.phase{cursor:pointer;}
+.phase.selected{border-color:var(--acc);background:var(--acc-glow);}
 
-init();
+/* Sold out mint button */
+.mint-btn:disabled{
+  opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important;
+  border-color:var(--b1);color:var(--t2);
+}
+.phase-meta{display:flex;gap:8px;flex-wrap:wrap;}
+.phase-pill{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;background:var(--bg);border:1px solid var(--b0);color:var(--t1);}
+.phase-pill.eth{color:var(--acc);}
+
+/* ── CONFIGURE MINT (right sidebar) ── */
+.mint-config{
+  background:var(--card);border:1px solid var(--b1);
+  border-radius:var(--r);padding:16px;
+}
+.mc-title{font-size:9px;font-weight:700;color:var(--t2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;}
+.mc-mode-lbl{font-size:9px;font-weight:700;color:var(--t2);letter-spacing:.09em;text-transform:uppercase;margin-bottom:6px;}
+.mc-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.mc-field label{display:block;font-size:9px;font-weight:600;color:var(--t2);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;}
+.mc-field input{
+  width:100%;background:var(--card2);border:1px solid var(--b1);color:var(--t0);
+  padding:8px 10px;font-family:var(--fi);font-size:12px;
+  border-radius:var(--r-sm);outline:none;
+}
+.mc-field input:focus{border-color:var(--acc);}
+.mc-field input::placeholder{color:var(--t2);}
+
+/* Mode tabs */
+.mode-tabs{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  border:1px solid var(--b1);border-radius:var(--r-sm);overflow:hidden;margin-bottom:6px;
+}
+.mode-tab{
+  padding:8px;background:transparent;border:none;border-right:1px solid var(--b1);
+  color:var(--t1);font-family:var(--fi);font-size:10px;font-weight:600;
+  cursor:pointer;text-align:center;letter-spacing:.05em;
+}
+.mode-tab:last-child{border-right:none;}
+.mode-tab:hover:not(.on){color:var(--t0);}
+.mode-tab.on{color:var(--acc);border-bottom:2px solid var(--acc);}
+.mode-note{font-size:10px;color:var(--t2);margin-bottom:10px;}
+
+/* Schedule */
+.sched-row{margin-bottom:10px;}
+.sched-row label{display:block;font-size:9px;font-weight:600;color:var(--t2);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;}
+.sched-row input{
+  width:100%;background:var(--card2);border:1px solid var(--b1);color:var(--t0);
+  padding:8px 10px;font-family:var(--fi);font-size:12px;
+  border-radius:var(--r-sm);outline:none;
+}
+.sched-row input:focus{border-color:var(--acc);}
+
+/* ── MINT BUTTON ── */
+.mint-btn{
+  width:100%;padding:14px;
+  background:var(--acc-glow);
+  border:1px solid var(--acc);
+  border-radius:var(--r);
+  color:var(--t0);
+  font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:.03em;
+  cursor:pointer;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+.mint-btn:hover{
+  background:rgba(124,47,212,.18);color:var(--acc2);
+  transform:translateY(-1px);
+  box-shadow:0 6px 20px rgba(124,47,212,.2);
+}
+.mint-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;}
+
+.queue-btn{
+  width:100%;padding:10px;
+  background:transparent;color:var(--t2);
+  border:1px solid var(--b1);border-radius:var(--r);
+  font-family:var(--fi);font-size:12px;font-weight:600;cursor:pointer;
+}
+.queue-btn:hover{color:var(--t1);border-color:var(--acc);}
+
+/* Supply note */
+.limit-note{
+  display:none;align-items:center;gap:8px;padding:10px 14px;
+  background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.2);
+  border-radius:var(--r-sm);font-size:11px;color:var(--warn);
+}
+.limit-note.show{display:flex;}
+
+/* ── TASK QUEUE ── */
+.queue-section{margin-top:18px;display:none;}
+.queue-section.show{display:block;}
+.queue-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.queue-title{font-size:10px;font-weight:700;color:var(--t2);letter-spacing:.1em;text-transform:uppercase;}
+.queue-cnt{font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid var(--b0);color:var(--t2);}
+
+.task-card{
+  background:var(--card);border:1px solid var(--b0);
+  border-radius:var(--r);padding:12px 14px;margin-bottom:8px;
+  border-left:2px solid var(--b1);
+}
+.task-card.waiting{border-left-color:var(--warn);}
+.task-card.ready{border-left-color:var(--ok);}
+.task-card.watching{border-left-color:var(--acc);}
+.tc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.tc-addr{font-size:11.5px;font-weight:600;color:var(--t0);}
+.tc-badge{font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:20px;}
+.tc-badge.waiting{background:rgba(217,119,6,.1);color:var(--warn);border:1px solid rgba(217,119,6,.2);}
+.tc-badge.ready{background:rgba(16,185,129,.1);color:var(--ok);border:1px solid rgba(16,185,129,.2);}
+.tc-badge.watching{background:var(--acc-glow);color:var(--acc2);border:1px solid rgba(124,47,212,.2);}
+.tc-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;}
+.tc-m .lk{font-size:8px;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:2px;}
+.tc-m .lv{font-size:11px;font-weight:600;color:var(--t0);}
+.tc-m .lv.hi{color:var(--acc);}
+.tc-acts{display:flex;gap:6px;}
+.tc-btn{padding:4px 10px;border-radius:var(--r-sm);font-family:var(--fi);font-size:10px;font-weight:600;cursor:pointer;border:1px solid var(--b0);background:transparent;color:var(--t1);}
+.tc-btn.fire{background:rgba(16,185,129,.08);color:var(--ok);border-color:rgba(16,185,129,.2);}
+.tc-btn.fire:hover{background:rgba(16,185,129,.18);}
+.tc-btn.del:hover{color:var(--err);}
+
+/* ── LOG ── */
+.log-section{margin-top:14px;}
+.log{
+  background:var(--card);border:1px solid var(--b0);border-radius:var(--r);
+  padding:10px 12px;height:72px;overflow-y:auto;font-size:9.5px;font-family:"Inter",monospace;
+}
+.le{padding:1.5px 0;color:var(--t2);}
+.le .ts{opacity:.4;margin-right:6px;}
+.le.ok{color:var(--ok);}
+.le.err{color:var(--err);}
+.le.warn{color:var(--warn);}
+.le.info{color:var(--acc2);}
+.le a{color:var(--acc2);text-decoration:none;}
+.le a:hover{text-decoration:underline;}
+
+/* ── MODAL ── */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:none;place-items:center;z-index:200;}
+.ov.open{display:grid;}
+.modal{
+  background:var(--card);border:1px solid var(--b1);border-radius:14px;
+  padding:24px;width:400px;max-width:95vw;position:relative;
+  box-shadow:0 24px 60px rgba(0,0,0,.2);
+}
+.modal h2{font-family:var(--fd);font-size:16px;font-weight:800;margin-bottom:4px;color:var(--t0);}
+.modal p{font-size:11px;color:var(--t1);margin-bottom:14px;line-height:1.6;}
+.mcls{
+  position:absolute;top:14px;right:14px;
+  background:var(--card2);border:1px solid var(--b0);color:var(--t1);
+  width:26px;height:26px;border-radius:6px;font-size:14px;
+  cursor:pointer;display:grid;place-items:center;
+}
+.mcls:hover{color:var(--t0);}
+.txbox{background:var(--bg);border:1px solid var(--b0);border-radius:var(--r-sm);padding:12px;margin-bottom:14px;}
+.txr{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--b0);}
+.txr:last-child{border:none;}
+.txk{font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;}
+.txv{font-size:11px;font-weight:500;text-align:right;max-width:60%;overflow:hidden;text-overflow:ellipsis;color:var(--t0);}
+.modal-btns{display:flex;flex-direction:column;gap:8px;}
+.btn-mm{
+  padding:13px;background:rgba(245,130,32,.08);border:1px solid rgba(245,130,32,.25);
+  color:#f58220;border-radius:var(--r);font-family:var(--fd);font-size:13px;font-weight:800;
+  cursor:pointer;width:100%;
+}
+.btn-mm:hover{background:rgba(245,130,32,.16);}
+.btn-dl{
+  padding:11px;background:var(--card2);border:1px solid var(--b1);color:var(--t1);
+  border-radius:var(--r);font-family:var(--fi);font-size:12px;font-weight:600;
+  cursor:pointer;width:100%;text-decoration:none;display:block;text-align:center;
+}
+.btn-dl:hover{color:var(--t0);border-color:var(--acc);}
+.mfoot{font-size:9px;color:var(--t2);line-height:1.6;border-top:1px solid var(--b0);padding-top:10px;margin-top:4px;}
+
+/* ── MOBILE ── */
+@media(max-width:860px){
+  .page{padding:16px 14px 40px;}
+  .page-grid{grid-template-columns:1fr;}
+  .col-side{position:static;}
+}
+@media(max-width:480px){
+  .mc-row{grid-template-columns:1fr;}
+  .tc-meta{grid-template-columns:1fr 1fr;}
+}
