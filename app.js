@@ -6,14 +6,15 @@
 
 'use strict';
 
-import { executeMint, detectPrice } from './mintEngine.js';
+import { executeMint, detectPrice, createPrivateKeySigner, getPrivateKeyAddress } from './mintEngine.js';
 
 const $ = id => document.getElementById(id);
 
 const S = {
   provider: null, signer: null, addr: null,
   ethPrice: 0, gasPrice: 0,
-  tasks: [], mode: 'manual', pending: null
+  tasks: [], mode: 'manual', pending: null,
+  pkMode: false  // true when using private key instead of MetaMask
 };
 
 const COL = {
@@ -320,14 +321,15 @@ async function resolveReservoirSlug(slug) {
   const d = await fetchWithFallback(url, { timeoutMs: 6000 });
   const col = d.collections?.[0];
   if (!col) return null;
+  const rawName = (col.name || 'Collection').replace(/\s+\d+\.?\d*\s*(ETH|eth|Ξ)/g, '').trim();
   return {
     contract: col.primaryContract || col.contract || null,
-    name: col.name || 'Collection',
+    name: rawName || 'Collection',
     image: col.image || '',
-    banner: col.banner || col.image || '',
+    banner: col.bannerImageUrl || col.banner || col.image || '',
     floor: col.floorAsk?.price?.amount?.native || col.floorAsk?.price?.amount?.decimal || 0,
     supply: parseInt(col.tokenCount) || 0,
-    minted: parseInt(col.tokenCount) || 0,
+    minted: parseInt(col.mintedCount || col.primaryContract && 0) || 0,
     twitterUrl: col.twitterUsername ? 'https://x.com/' + col.twitterUsername : '',
     osUrl: 'https://opensea.io/collection/' + slug,
     source: 'Reservoir'
@@ -434,6 +436,8 @@ async function fetchCollection() {
     } else {
       log('Price not auto-detected', 'warn');
     }
+    // Re-render phase with confirmed price
+    renderPhase(COL.price, COL.supply);
 
     $('limitNote').classList.remove('show');
     if (supply > 0) {
@@ -445,6 +449,22 @@ async function fetchCollection() {
     setStatus('Error: ' + e.message, 'err');
     log(e.message, 'err');
   }
+}
+
+
+function renderPhase(price, supply) {
+  const p = price > 0 ? parseFloat(price) : 0;
+  $('phaseList').innerHTML =
+    '<div class="phase selected">' +
+      '<div class="phase-top">' +
+        '<span class="phase-name">' + (p === 0 ? 'FREE MINT' : 'PUBLIC MINT') + '</span>' +
+        '<span class="phase-timer live">LIVE</span>' +
+      '</div>' +
+      '<div class="phase-meta">' +
+        '<span class="phase-pill eth">PRICE · ' + (p > 0 ? p.toFixed(4) + ' Ξ' : 'FREE') + '</span>' +
+        '<span class="phase-pill">SUPPLY · ' + (supply > 0 ? supply.toLocaleString() : '—') + '</span>' +
+      '</div>' +
+    '</div>';
 }
 
 function renderColCard({ name, image, banner, contract, supply, minted, floor, twitterUrl, osUrl }) {
@@ -479,17 +499,7 @@ function renderColCard({ name, image, banner, contract, supply, minted, floor, t
   links.push('<a class="col-link" href="https://etherscan.io/address/' + contract + '" target="_blank" rel="noopener">Etherscan</a>');
   $('colLinks').innerHTML = links.join('');
 
-  $('phaseList').innerHTML =
-    '<div class="phase selected">' +
-      '<div class="phase-top">' +
-        '<span class="phase-name">' + (floor === 0 ? 'FREE MINT' : 'PUBLIC MINT') + '</span>' +
-        '<span class="phase-timer live">LIVE</span>' +
-      '</div>' +
-      '<div class="phase-meta">' +
-        '<span class="phase-pill eth">PRICE - ' + (floor > 0 ? floor.toFixed(4) + ' ETH' : 'FREE') + '</span>' +
-        '<span class="phase-pill">SUPPLY - ' + (supply > 0 ? supply.toLocaleString() : '-') + '</span>' +
-      '</div>' +
-    '</div>';
+  renderPhase(floor, supply);
 
   $('colCard').classList.add('show');
 }
@@ -715,7 +725,7 @@ $('overlay').onclick = e => { if (e.target.id === 'overlay') $('overlay').classL
 window.toggleTheme = function() {
   const isDark = document.documentElement.classList.toggle('dark');
   document.body.classList.toggle('dark', isDark);
-  $('themeIcon').textContent = isDark ? 'Moon' : 'Circle';
+  $('themeIcon').textContent = isDark ? '☽' : '○';
   localStorage.setItem('mb_theme', isDark ? 'dark' : 'light');
 };
 
@@ -724,9 +734,47 @@ window.toggleTheme = function() {
     document.documentElement.classList.add('dark');
     document.body.classList.add('dark');
     const ic = document.getElementById('themeIcon');
-    if (ic) ic.textContent = 'Moon';
+    if (ic) ic.textContent = '☽';
   }
 })();
+
+
+/* ══════════════════════════════════════
+   PRIVATE KEY MODE
+══════════════════════════════════════ */
+window.connectPrivateKey = async function() {
+  const pkInput = $('pkInput');
+  if (!pkInput) return;
+  const pk = pkInput.value.trim();
+  if (!pk) { setStatus('Enter a private key.', 'err'); return; }
+
+  try {
+    const wallet = createPrivateKeySigner(pk);
+    S.signer = wallet;
+    S.addr = await wallet.getAddress();
+    S.pkMode = true;
+
+    setStatus('Private key wallet connected.', 'ok');
+    pkInput.value = ''; // clear immediately for security
+    $('pkInput').placeholder = '✓ Key loaded — cleared for security';
+
+    setWalletConnected(S.addr);
+    if ($('mAddr')) $('mAddr').value = S.addr;
+    log('PK wallet: ' + S.addr, 'ok');
+
+    // Hide PK section
+    const pkSection = $('pkSection');
+    if (pkSection) pkSection.style.display = 'none';
+  } catch(e) {
+    setStatus('Invalid private key: ' + e.message, 'err');
+    log(e.message, 'err');
+  }
+};
+
+window.togglePKSection = function() {
+  const s = $('pkSection');
+  if (s) s.style.display = s.style.display === 'none' ? 'block' : 'none';
+};
 
 async function init() {
   setInterval(tickTasks, 1000);
