@@ -59,19 +59,29 @@ function _setEth(p) {
 }
 
 async function loadGas() {
-  try {
-    const r = await fetch('https://ethereum.publicnode.com', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_gasPrice', params: [], id: 1 })
-    });
-    const d = await r.json();
-    if (d.result) {
-      const g = Math.round(parseInt(d.result, 16) / 1e9);
-      S.gasPrice = g;
-      $('gasP').textContent = g;
-    }
-  } catch(e) {}
+  const rpcs = [
+    'https://ethereum.publicnode.com',
+    'https://rpc.ankr.com/eth',
+    'https://cloudflare-eth.com'
+  ];
+
+  for (const url of rpcs) {
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_gasPrice', params: [], id: 1 })
+      });
+      const d = await r.json();
+      if (d.result) {
+        const g = parseInt(d.result, 16) / 1e9;
+        S.gasPrice = g;
+        $('gasP').textContent = g >= 10 ? Math.round(g) : g.toFixed(1).replace(/\.0$/, '');
+        return;
+      }
+    } catch(e) {}
+  }
+  $('gasP').textContent = '--';
 }
 
 function log(msg, t = '') {
@@ -89,9 +99,20 @@ function setStatus(msg, t = '') {
   el.className = 'status-msg ' + t;
 }
 
-window.connectWallet = async function() {
+window.connectWallet = async function({ forcePicker = false } = {}) {
   if (!window.ethereum) { alert('Install MetaMask'); return; }
   try {
+    if (forcePicker && window.ethereum.request) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_requestPermissions',
+          params: [{ eth_accounts: {} }]
+        });
+      } catch(e) {
+        if (e.code === 4001) throw e;
+      }
+    }
+
     S.provider = new ethers.providers.Web3Provider(window.ethereum);
     await S.provider.send('eth_requestAccounts', []);
     S.signer = S.provider.getSigner();
@@ -99,8 +120,10 @@ window.connectWallet = async function() {
     setWalletConnected(S.addr);
     if ($('mAddr')) $('mAddr').value = S.addr;
     log('Connected: ' + S.addr, 'ok');
+    setStatus('Wallet connected.', 'ok');
   } catch(e) {
-    log('Wallet error: ' + e.message, 'err');
+    log('Wallet error: ' + (e.message || e), 'err');
+    setStatus(e.code === 4001 ? 'Wallet connection cancelled.' : 'Wallet connection failed.', 'err');
   }
 };
 
@@ -109,11 +132,20 @@ function setWalletConnected(addr) {
   if (!btn) return;
   btn.textContent = addr.slice(0, 6) + '...' + addr.slice(-4);
   btn.classList.add('connected');
-  btn.disabled = true;
+  btn.disabled = false;
+  btn.title = 'Click to choose a different MetaMask account';
+  btn.onclick = () => window.connectWallet({ forcePicker: true });
   if ($('disconnectBtn')) $('disconnectBtn').hidden = false;
 }
 
-window.disconnectWallet = function() {
+window.disconnectWallet = async function() {
+  try {
+    await window.ethereum?.request?.({
+      method: 'wallet_revokePermissions',
+      params: [{ eth_accounts: {} }]
+    });
+  } catch(e) {}
+
   S.provider = null;
   S.signer = null;
   S.addr = null;
@@ -122,9 +154,12 @@ window.disconnectWallet = function() {
     btn.textContent = 'Connect Wallet';
     btn.classList.remove('connected');
     btn.disabled = false;
+    btn.title = '';
+    btn.onclick = () => window.connectWallet();
   }
   if ($('disconnectBtn')) $('disconnectBtn').hidden = true;
   if ($('mAddr')) $('mAddr').value = '';
+  setStatus('Wallet disconnected. Click Connect Wallet to choose an account.', 'ok');
   log('Wallet disconnected', 'info');
 };
 
@@ -132,6 +167,8 @@ if (window.ethereum) {
   window.ethereum.on?.('accountsChanged', accounts => {
     if (accounts?.length) {
       S.addr = accounts[0];
+      S.provider = new ethers.providers.Web3Provider(window.ethereum);
+      S.signer = S.provider.getSigner();
       setWalletConnected(S.addr);
       if ($('mAddr')) $('mAddr').value = S.addr;
       log('Wallet switched: ' + S.addr, 'info');
@@ -139,6 +176,22 @@ if (window.ethereum) {
       window.disconnectWallet();
     }
   });
+}
+
+async function ensureSignerMatches(addr) {
+  if (!S.signer) {
+    await window.connectWallet();
+  }
+  if (!S.signer) return false;
+
+  const signerAddr = (await S.signer.getAddress()).toLowerCase();
+  if (addr && addr.toLowerCase() !== signerAddr) {
+    setStatus('MetaMask is connected to a different account. Click the connected wallet button to switch accounts.', 'err');
+    log('Wallet mismatch: field has ' + addr + ', MetaMask has ' + signerAddr, 'warn');
+    return false;
+  }
+  if ($('mAddr')) $('mAddr').value = await S.signer.getAddress();
+  return true;
 }
 
 function parseUrl(raw) {
@@ -170,29 +223,40 @@ function parseUrl(raw) {
 $('fetchBtn').addEventListener('click', fetchCollection);
 $('urlIn').addEventListener('keydown', e => { if (e.key === 'Enter') fetchCollection(); });
 
-async function fetchWithFallback(url, { parse = 'json' } = {}) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 6500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchWithFallback(url, { parse = 'json', timeoutMs = 6500, direct = true } = {}) {
   const proxies = [
-    '',
+    ...(direct ? [''] : []),
     'https://corsproxy.io/?url=',
     'https://api.allorigins.win/raw?url='
   ];
   let lastError = null;
   for (const p of proxies) {
     try {
-      const r = await fetch(p ? p + encodeURIComponent(url) : url);
+      const r = await fetchWithTimeout(p ? p + encodeURIComponent(url) : url, {}, timeoutMs);
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return parse === 'text' ? await r.text() : await r.json();
     } catch(e) {
       lastError = e;
     }
   }
-  throw new Error(lastError?.message || 'Failed to fetch');
+  throw new Error(lastError?.name === 'AbortError' ? 'request timed out' : (lastError?.message || 'Failed to fetch'));
 }
 
 async function resolveOpenSeaSlug(slug) {
   let meta = null;
   try {
-    const d = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + slug);
+    setStatus('Loading OpenSea collection preview...');
+    const d = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + slug, { timeoutMs: 4500 });
     if (d) {
       meta = {
         contract: d.contracts?.[0]?.address || null,
@@ -203,36 +267,57 @@ async function resolveOpenSeaSlug(slug) {
         osUrl: 'https://opensea.io/collection/' + (d.collection || slug),
         supply: d.total_supply ? parseInt(d.total_supply) : 0,
         minted: 0,
-        floor: 0
+        floor: 0,
+        source: 'OpenSea'
       };
-      try {
-        const sd = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + (d.collection || slug) + '/stats');
-        if (sd.total) {
-          meta.floor = sd.total.floor_price || 0;
-          meta.minted = sd.total.count || 0;
-        }
-      } catch(e) {}
     }
   } catch(e) {
-    log('OpenSea API failed: ' + e.message, 'warn');
+    log('OpenSea API failed: ' + e.message + ' - trying Reservoir', 'warn');
   }
 
-  if (!meta?.contract) {
-    try {
-      const html = await fetchWithFallback('https://opensea.io/collection/' + slug, { parse: 'text' });
-      const contract = html.match(/0x[a-fA-F0-9]{40}/)?.[0] || null;
-      if (contract) meta = { ...(meta || {}), contract, osUrl: 'https://opensea.io/collection/' + slug };
-    } catch(e) {
-      log('OpenSea page scan failed: ' + e.message, 'warn');
+  if (meta?.contract) return meta;
+
+  try {
+    setStatus('OpenSea API is blocked. Scanning OpenSea page mirror...');
+    const page = await fetchWithFallback('https://r.jina.ai/https://opensea.io/collection/' + slug, {
+      parse: 'text',
+      timeoutMs: 9000,
+      direct: true
+    });
+    const contract = page.match(/0x[a-fA-F0-9]{40}/)?.[0] || null;
+    if (contract) {
+      const title = page.match(/^Title:\s*(.+)$/m)?.[1]?.replace(/ - Collection \| OpenSea$/, '') || 'Collection';
+      return {
+        contract,
+        name: title,
+        image: '',
+        banner: '',
+        twitterUrl: '',
+        osUrl: 'https://opensea.io/collection/' + slug,
+        supply: 0,
+        minted: 0,
+        floor: 0,
+        source: 'OpenSea page mirror'
+      };
     }
+  } catch(e) {
+    log('OpenSea page mirror failed: ' + e.message, 'warn');
+  }
+
+  try {
+    setStatus('Trying Reservoir mirror...');
+    const d = await resolveReservoirSlug(slug);
+    if (d?.contract) return { ...d, source: 'Reservoir mirror' };
+  } catch(e) {
+    log('Reservoir mirror failed: ' + e.message, 'warn');
   }
 
   return meta;
 }
 
 async function resolveReservoirSlug(slug) {
-  const url = 'https://api.reservoir.tools/collections/v7?slug=' + encodeURIComponent(slug);
-  const d = await fetchWithFallback(url);
+  const url = 'https://api.reservoir.tools/collections/v6?slug=' + encodeURIComponent(slug);
+  const d = await fetchWithFallback(url, { timeoutMs: 6000 });
   const col = d.collections?.[0];
   if (!col) return null;
   return {
@@ -240,11 +325,12 @@ async function resolveReservoirSlug(slug) {
     name: col.name || 'Collection',
     image: col.image || '',
     banner: col.banner || col.image || '',
-    floor: col.floorAsk?.price?.amount?.decimal || 0,
+    floor: col.floorAsk?.price?.amount?.native || col.floorAsk?.price?.amount?.decimal || 0,
     supply: parseInt(col.tokenCount) || 0,
-    minted: parseInt(col.onSaleCount || col.tokenCount) || 0,
+    minted: parseInt(col.tokenCount) || 0,
     twitterUrl: col.twitterUsername ? 'https://x.com/' + col.twitterUsername : '',
-    osUrl: 'https://opensea.io/collection/' + slug
+    osUrl: 'https://opensea.io/collection/' + slug,
+    source: 'Reservoir'
   };
 }
 
@@ -255,7 +341,7 @@ async function fetchCollection() {
   const parsed = parseUrl(raw);
   if (!parsed) { setStatus('Invalid link - try pasting the 0x address directly.', 'err'); return; }
 
-  setStatus('Resolving collection...');
+  setStatus('Resolving ETH collection...');
   log('Resolving: ' + parsed.value);
   $('colCard').classList.remove('show');
 
@@ -278,7 +364,7 @@ async function fetchCollection() {
         minted = d.minted || 0;
         twitterUrl = d.twitterUrl || '';
         osUrl = d.osUrl || 'https://opensea.io/collection/' + parsed.value;
-        log('Resolved via OpenSea', 'ok');
+        log('Resolved via ' + (d.source || 'OpenSea'), 'ok');
       }
     }
 
@@ -301,7 +387,7 @@ async function fetchCollection() {
     }
 
     if (!contract?.match(/^0x[a-fA-F0-9]{40}$/)) {
-      setStatus('Could not resolve contract - paste the 0x address directly.', 'err');
+      setStatus('Could not resolve this OpenSea collection automatically. Paste the 0x ETH contract address instead.', 'err');
       return;
     }
 
@@ -455,8 +541,8 @@ $('mintBtn').addEventListener('click', async () => {
 
   const task = buildTask(addr);
   if (S.mode === 'manual') {
-    if (S.signer) {
-      setStatus('Minting...');
+    if (await ensureSignerMatches(addr)) {
+      setStatus('Opening MetaMask for signature...');
       try {
         const result = await executeMint(task.contract, S.signer, task.qty, msg => log(msg, 'info'), task.options);
         setStatus(result.success ? 'Mint successful' : 'Done', 'ok');
@@ -465,7 +551,7 @@ $('mintBtn').addEventListener('click', async () => {
         log(e.message, 'err');
       }
     } else {
-      openModal(task);
+      setStatus('Connect MetaMask to sign this mint.', 'err');
     }
   } else if (S.mode === 'scheduled') {
     task.status = 'waiting';
@@ -480,7 +566,7 @@ $('mintBtn').addEventListener('click', async () => {
   }
 });
 
-$('queueBtn').addEventListener('click', () => {
+$('queueBtn').addEventListener('click', async () => {
   if (!COL.contract) { setStatus('Fetch a collection first.', 'err'); return; }
   const addr = $('mAddr').value.trim() || S.addr;
   if (!addr?.match(/^0x[a-fA-F0-9]{40}$/)) {
@@ -489,6 +575,7 @@ $('queueBtn').addEventListener('click', () => {
     return;
   }
   const task = buildTask(addr);
+  if (S.signer && !(await ensureSignerMatches(addr))) return;
   task.status = 'waiting';
   S.tasks.unshift(task);
   renderTasks();
@@ -607,7 +694,8 @@ function openModal(task) {
 
 window.signWithMM = async function() {
   const t = S.pending;
-  if (!t || !S.signer) return;
+  if (!t) return;
+  if (!(await ensureSignerMatches(t.addr))) return;
   $('overlay').classList.remove('open');
   setStatus('Minting...');
   try {
