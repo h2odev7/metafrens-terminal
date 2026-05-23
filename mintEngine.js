@@ -60,20 +60,31 @@ export function findMintFunctions(abi) {
    PRICE DETECTION
    Tries common price getter names
 ══════════════════════════════════════ */
-export async function detectPrice(contract) {
-  const priceFns = [
-    "publicPrice", "cost", "mintPrice", "price",
-    "PRICE", "mintCost", "salePrice", "tokenPrice"
+export async function detectPrice(contractAddress, provider) {
+  const abi = [
+    "function publicSalePrice() view returns (uint256)",
+    "function mintPrice() view returns (uint256)",
+    "function price() view returns (uint256)",
+    "function cost() view returns (uint256)",
+    "function getPrice() view returns (uint256)",
+    "function publicPrice() view returns (uint256)",
+    "function salePrice() view returns (uint256)",
+    "function tokenPrice() view returns (uint256)"
   ];
-  for (const fn of priceFns) {
+  const contract = new ethers.Contract(contractAddress, abi, provider);
+  const methods = [
+    "publicSalePrice", "mintPrice", "price",
+    "cost", "getPrice", "publicPrice", "salePrice", "tokenPrice"
+  ];
+  for (const m of methods) {
     try {
-      if (contract[fn]) {
-        const p = await contract[fn]();
-        if (p && p > 0n) return p;
+      const p = await contract[m]();
+      if (p && p.toString() !== "0") {
+        return ethers.utils.formatEther(p); // returns string e.g. "0.0800"
       }
     } catch(e) {}
   }
-  return 0n;
+  return null; // not detected
 }
 
 /* ══════════════════════════════════════
