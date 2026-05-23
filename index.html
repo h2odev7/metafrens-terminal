@@ -36,6 +36,7 @@
     <div class="tb-stat"><span class="tb-l">ETH</span><span class="tb-v" id="ethP">$—</span></div>
     <div class="tb-stat"><span class="tb-l">GWEI</span><span class="tb-v" id="gasP">—</span></div>
     <button class="wb" id="walletBtn" onclick="connectWallet()">Connect Wallet</button>
+    <button class="wb wb-disconnect" id="disconnectBtn" onclick="disconnectWallet()" hidden>Disconnect</button>
   </div>
 </div>
 
@@ -45,11 +46,10 @@
   <!-- URL BAR — full width -->
   <div class="url-bar">
     <input type="text" id="urlIn" class="url-in" placeholder="Paste any ETH mint link or 0x contract address…"/>
-    <button class="url-btn" id="fetchBtn">→</button>
+    <button class="url-btn" id="fetchBtn">Fetch</button>
   </div>
   <p class="url-hint">
-    <span>opensea.io</span> · <span>zora.co</span> · <span>mint.fun</span> ·
-    <span>foundation.app</span> · <span>manifold.xyz</span> · <span>0x contract</span>
+    <span class="primary">opensea.io collection URL</span> · <span>0x contract</span> · <span>zora.co</span> · <span>mint.fun</span>
   </p>
   <div class="status-msg" id="statusMsg"></div>
 
