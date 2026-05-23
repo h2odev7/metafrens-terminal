@@ -4,31 +4,349 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>METABOT</title>
+<!-- THEME TOGGLE -->
+<button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle dark/light mode">
+  <span id="themeIcon">☽</span>
+</button>
+
 <script>
-// Load ethers with fallback CDNs
 (function(){
   const cdns=[
     'https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js',
     'https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js'
   ];
-  let idx=0;
+  let i=0;
   function load(){
-    if(idx>=cdns.length){console.warn('ethers failed to load from all CDNs');return;}
+    if(i>=cdns.length)return;
     const s=document.createElement('script');
-    s.src=cdns[idx++];
-    s.onload=()=>console.log('ethers loaded from',s.src);
-    s.onerror=()=>{console.warn('CDN failed, trying next...');load();};
+    s.src=cdns[i++];
+    s.onerror=load;
     document.head.appendChild(s);
   }
   load();
 })();
 </script>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#000000;--card:#080808;--card2:#0f0f0f;
+  --b0:rgba(255,255,255,.05);--b1:rgba(255,255,255,.09);
+  --acc:#7c2fd4;--acc2:#9d50e8;--acc-glow:rgba(124,47,212,.15);
+  --ok:#00b894;--err:#d63031;--warn:#fdcb6e;
+  --t0:#f0f0f8;--t1:#7777aa;--t2:#3a3a55;
+  --fd:"Syne",sans-serif;--fi:"Inter",sans-serif;
+  --r:10px;--r-sm:6px;
+}
+/* LIGHT MODE — default */
+:root{
+  --bg:#f5f5f8;--card:#ffffff;--card2:#ededf3;
+  --b0:rgba(0,0,0,.06);--b1:rgba(0,0,0,.11);
+  --t0:#0a0a14;--t1:#4a4a6a;--t2:#9090b0;
+}
+/* DARK MODE */
+.dark{
+  --bg:#000000;--card:#080808;--card2:#0f0f0f;
+  --b0:rgba(255,255,255,.05);--b1:rgba(255,255,255,.09);
+  --t0:#f0f0f8;--t1:#7777aa;--t2:#3a3a55;
+  --acc-glow:rgba(124,47,212,.15);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{min-height:100%;background:var(--bg);color:var(--t0);font-family:var(--fi);font-size:14px;transition:background .25s,color .25s;}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:var(--card2);}
+
+/* ── TOPBAR ── */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;height:48px;
+  background:var(--card);border-bottom:1px solid var(--b0);
+  position:sticky;top:0;z-index:50;
+}
+.brand{display:flex;align-items:center;gap:8px;}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:p 2s infinite;}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+.wm{font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:.04em;
+  background:linear-gradient(90deg,var(--t0) 10%,var(--acc) 50%,var(--acc2) 65%,var(--t0) 90%);
+  background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:sh 4s linear infinite;}
+@keyframes sh{0%{background-position:200%}100%{background-position:-200%}}
+.tb-r{display:flex;align-items:center;gap:14px;}
+.tb-stat{text-align:right;}
+.tb-l{font-size:9px;color:var(--t2);letter-spacing:.1em;text-transform:uppercase;display:block;}
+.tb-v{font-size:12px;font-weight:600;}
+.tb-v.up{color:var(--ok);}
+.tb-v.down{color:var(--err);}
+.wb{padding:7px 16px;background:transparent;color:var(--t0);
+  border:1px solid var(--b1);border-radius:var(--r-sm);
+  font-family:var(--fi);font-size:11px;font-weight:600;cursor:pointer;
+  transition:all .15s;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+.wb:hover{border-color:var(--acc);color:var(--acc);}
+.wb.connected{border-color:rgba(0,184,148,.4);color:var(--ok);}
+#clk{display:none;}
+
+/* THEME TOGGLE — fixed bottom right */
+.theme-toggle{
+  position:fixed;bottom:24px;right:24px;z-index:100;
+  width:44px;height:44px;border-radius:50%;
+  background:rgba(124,47,212,.08);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:1px solid rgba(124,47,212,.3);
+  color:var(--t1);font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .2s;
+  box-shadow:0 4px 16px rgba(0,0,0,.4);
+}
+.theme-toggle:hover{border-color:var(--acc);color:var(--acc);
+  background:rgba(124,47,212,.18);
+  box-shadow:0 6px 20px rgba(124,47,212,.25);}
+
+/* ── PAGE ── */
+.page{max-width:680px;margin:0 auto;padding:24px 20px 60px;}
+
+/* ── URL BAR ── */
+.url-bar{display:flex;gap:8px;margin-bottom:20px;}
+.url-in{
+  flex:1;background:var(--card);border:1px solid var(--b1);color:var(--t0);box-shadow:0 1px 3px rgba(0,0,0,.06);
+  padding:12px 16px;font-family:var(--fi);font-size:13px;
+  border-radius:var(--r);outline:none;transition:border-color .15s;
+}
+.url-in:focus{border-color:var(--acc);}
+.url-in::placeholder{color:var(--t2);}
+.url-btn{padding:12px 20px;background:var(--acc);color:#fff;border:none;
+  border-radius:var(--r);font-family:var(--fi);font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .15s;white-space:nowrap;}
+.url-btn:hover{background:var(--acc2);}
+.url-hint{font-size:11px;color:var(--t2);margin-bottom:20px;}
+.url-hint span{color:var(--t1);}
+
+/* ── COLLECTION CARD ── */
+.col-card{background:var(--card);border:1px solid var(--b0);border-radius:var(--r);
+  overflow:hidden;margin-bottom:16px;display:none;}
+.col-card.show{display:block;}
+
+.col-banner{
+  height:120px;background:linear-gradient(135deg,#1a0a3a,#2d1b6e,#1a0a3a);
+  position:relative;overflow:hidden;
+}
+.col-banner img{width:100%;height:100%;object-fit:cover;opacity:.7;}
+.col-banner-overlay{
+  position:absolute;inset:0;
+  background:linear-gradient(to right,rgba(0,0,0,.5) 0%,transparent 60%);
+  display:flex;align-items:center;padding:16px;gap:14px;
+}
+.col-thumb{width:64px;height:64px;border-radius:10px;border:2px solid rgba(255,255,255,.2);
+  object-fit:cover;background:var(--card2);flex-shrink:0;}
+.col-thumb-ph{width:64px;height:64px;border-radius:10px;border:2px solid rgba(255,255,255,.15);
+  background:var(--card2);flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--fd);font-size:22px;font-weight:800;color:rgba(255,255,255,.15);}
+.col-info{flex:1;min-width:0;}
+.col-name{font-family:var(--fd);font-size:18px;font-weight:800;color:#fff;
+  text-shadow:0 1px 8px rgba(0,0,0,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.col-addr{display:inline-flex;align-items:center;gap:5px;margin-top:4px;
+  padding:3px 9px;background:rgba(0,0,0,.5);border-radius:20px;
+  font-size:10px;font-family:var(--fi);font-weight:600;color:rgba(255,255,255,.7);
+  text-decoration:none;transition:background .15s;}
+.col-addr:hover{background:rgba(0,0,0,.75);}
+
+.col-body{padding:14px 16px;}
+
+/* PROGRESS */
+.progress-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.progress-label{font-size:11px;color:var(--t1);}
+.progress-val{font-size:11px;font-weight:600;color:var(--t0);}
+.progress-bar{height:6px;background:var(--b0);border-radius:3px;overflow:hidden;margin-bottom:12px;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));
+  border-radius:3px;transition:width .4s ease;min-width:2px;}
+
+/* LINKS ROW */
+.col-links{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.col-link{font-size:11px;color:var(--acc2);text-decoration:none;
+  display:flex;align-items:center;gap:4px;}
+.col-link:hover{text-decoration:underline;}
+.col-link svg{opacity:.7;}
+
+/* PHASES */
+.phases-title{font-size:10px;font-weight:600;color:var(--t2);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:8px;}
+.phase{background:var(--card2);border:1px solid var(--b1);border-radius:var(--r-sm);
+  padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .15s;}
+.phase:hover{border-color:var(--b1);}
+.phase.selected{border-color:var(--acc);background:rgba(124,47,212,.07);}
+.phase-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.phase-name{font-family:var(--fd);font-size:13px;font-weight:700;color:var(--t0);}
+.phase-timer{font-size:10px;color:var(--t2);background:var(--bg);padding:3px 8px;
+  border-radius:20px;border:1px solid var(--b0);}
+.phase-timer.live{color:var(--ok);border-color:rgba(0,184,148,.25);background:rgba(0,184,148,.08);}
+.phase-timer.soon{color:var(--warn);border-color:rgba(253,203,110,.25);}
+.phase-meta{display:flex;gap:8px;flex-wrap:wrap;}
+.phase-pill{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;
+  background:var(--bg);border:1px solid var(--b0);color:var(--t1);}
+.phase-pill.eth{color:var(--acc2);}
+.phase-pill.free{color:var(--ok);}
+
+/* ── MINT CONFIG ── */
+.mint-config{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);
+  padding:16px;margin-bottom:12px;display:none;}
+.mint-config.show{display:block;}
+.mc-title{font-size:10px;font-weight:600;color:var(--t2);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:12px;}
+.mc-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.mc-field label{display:block;font-size:9px;font-weight:600;color:var(--t2);
+  letter-spacing:.09em;text-transform:uppercase;margin-bottom:4px;}
+.mc-field input{width:100%;background:var(--card2);border:1px solid var(--b1);color:var(--t0);
+  padding:8px 10px;font-family:var(--fi);font-size:12px;
+  border-radius:var(--r-sm);outline:none;transition:border-color .15s;}
+.mc-field input:focus{border-color:var(--acc);}
+.mc-field input::placeholder{color:var(--t2);}
+
+/* MODE TABS */
+.mode-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;
+  border:1px solid var(--b1);border-radius:var(--r-sm);overflow:hidden;margin-bottom:6px;
+  background:transparent;}
+.mode-tab{padding:8px;background:transparent;border:none;border-right:1px solid var(--b1);
+  color:var(--t1);font-family:var(--fi);font-size:10px;font-weight:600;
+  cursor:pointer;text-align:center;letter-spacing:.05em;transition:all .15s;}
+.mode-tab:last-child{border-right:none;}
+.mode-tab:hover:not(.on){color:var(--t0);}
+.mode-tab.on{background:transparent;color:var(--acc);border-bottom:2px solid var(--acc);}
+.mode-note{font-size:10px;color:var(--t2);margin-bottom:10px;}
+
+/* SCHEDULE TIME */
+.sched-row{margin-bottom:10px;}
+.sched-row label{display:block;font-size:9px;font-weight:600;color:var(--t2);
+  letter-spacing:.09em;text-transform:uppercase;margin-bottom:4px;}
+.sched-row input{width:100%;background:var(--card2);border:1px solid var(--b0);color:var(--t0);
+  padding:8px 10px;font-family:var(--fi);font-size:12px;
+  border-radius:var(--r-sm);outline:none;}
+.sched-row input:focus{border-color:var(--acc);}
+
+/* ── MINT BUTTON ── */
+.mint-btn{
+  width:100%;padding:14px;
+  background:rgba(124,47,212,.07);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  color:var(--t0);
+  border:1px solid rgba(124,47,212,.3);
+  border-radius:var(--r);
+  font-family:var(--fd);font-size:15px;font-weight:800;letter-spacing:.03em;
+  cursor:pointer;transition:all .25s;display:none;
+  position:relative;overflow:hidden;
+}
+.mint-btn::before{content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.05),rgba(108,92,231,.05));
+  pointer-events:none;}
+.mint-btn:hover{
+  background:rgba(124,47,212,.15);
+  border-color:var(--acc);color:var(--acc2);
+  transform:translateY(-1px);
+  box-shadow:0 6px 24px rgba(124,47,212,.2),inset 0 1px 0 rgba(255,255,255,.06);
+}
+.mint-btn.show{display:block;}
+.mint-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none;}
+
+.queue-btn{
+  width:100%;padding:11px;margin-top:8px;
+  background:transparent;color:var(--t2);
+  border:1px solid var(--b0);border-radius:var(--r);
+  font-family:var(--fi);font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .15s;display:none;letter-spacing:.02em;
+}
+.queue-btn:hover{color:var(--t1);border-color:var(--b1);}
+.queue-btn.show{display:block;}
+
+/* ── WALLET LIMIT ── */
+.limit-note{display:none;align-items:center;gap:8px;padding:10px 14px;
+  background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.2);
+  border-radius:var(--r-sm);font-size:11px;color:var(--warn);margin-top:8px;}
+.limit-note.show{display:flex;}
+
+/* ── TASK QUEUE ── */
+.queue-section{margin-top:20px;display:none;}
+.queue-section.show{display:block;}
+.queue-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.queue-title{font-size:10px;font-weight:700;color:var(--t2);letter-spacing:.1em;text-transform:uppercase;}
+.queue-cnt{font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid var(--b0);color:var(--t2);}
+.task-card{background:var(--card);border:1px solid var(--b0);border-radius:var(--r);
+  padding:12px 14px;margin-bottom:8px;border-left:2px solid var(--b1);}
+.task-card.waiting{border-left-color:var(--warn);}
+.task-card.ready{border-left-color:var(--ok);}
+.task-card.watching{border-left-color:var(--acc);}
+.tc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.tc-addr{font-size:11.5px;font-weight:600;}
+.tc-badge{font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 7px;border-radius:20px;}
+.tc-badge.waiting{background:rgba(253,203,110,.1);color:var(--warn);border:1px solid rgba(253,203,110,.2);}
+.tc-badge.ready{background:rgba(0,184,148,.1);color:var(--ok);border:1px solid rgba(0,184,148,.2);}
+.tc-badge.watching{background:rgba(124,47,212,.08);color:var(--acc2);border:1px solid rgba(108,92,231,.2);}
+.tc-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;}
+.tc-m .lk{font-size:8px;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:2px;}
+.tc-m .lv{font-size:11px;font-weight:600;}
+.tc-m .lv.hi{color:var(--acc2);}
+.tc-acts{display:flex;gap:6px;}
+.tc-btn{padding:4px 10px;border-radius:var(--r-sm);font-family:var(--fi);font-size:10px;
+  font-weight:600;cursor:pointer;transition:all .15s;border:1px solid var(--b0);}
+.tc-btn.fire{background:rgba(0,184,148,.1);color:var(--ok);border-color:rgba(0,184,148,.2);}
+.tc-btn.fire:hover{background:rgba(0,184,148,.18);}
+.tc-btn.del{background:none;color:var(--t2);border-color:transparent;}
+.tc-btn.del:hover{color:var(--err);}
+
+/* ── LOG ── */
+.log-section{margin-top:16px;}
+.log{background:var(--card);border:1px solid var(--b0);border-radius:var(--r);
+  padding:10px 12px;height:72px;overflow-y:auto;font-size:9.5px;font-family:"Inter",monospace;}
+.le{padding:1px 0;color:var(--t2);}
+.le .ts{color:var(--t2);opacity:.4;margin-right:6px;}
+.le.ok{color:var(--ok);}.le.err{color:var(--err);}.le.warn{color:var(--warn);}.le.info{color:var(--acc2);}
+
+/* ── STATUS ── */
+.status-msg{font-size:11px;margin-top:8px;color:var(--t2);min-height:16px;}
+.status-msg.ok{color:var(--ok);}
+.status-msg.err{color:var(--err);}
+.status-msg.loading::after{content:'';display:inline-block;width:10px;
+  animation:dots 1.2s infinite;letter-spacing:2px;}
+@keyframes dots{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+
+/* ── MODAL ── */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.9);backdrop-filter:blur(6px);
+  display:none;place-items:center;z-index:200;}
+.ov.open{display:grid;}
+.modal{background:var(--card);border:1px solid var(--b1);border-radius:14px;
+  padding:24px;width:400px;max-width:95vw;position:relative;
+  box-shadow:0 20px 60px rgba(0,0,0,.8);}
+.modal h2{font-family:var(--fd);font-size:16px;font-weight:800;margin-bottom:4px;}
+.modal p{font-size:11px;color:var(--t1);margin-bottom:14px;line-height:1.6;}
+.mcls{position:absolute;top:14px;right:14px;background:var(--card2);border:1px solid var(--b0);
+  color:var(--t1);width:24px;height:24px;border-radius:6px;font-size:13px;
+  cursor:pointer;display:grid;place-items:center;}
+.mcls:hover{color:var(--t0);}
+.txbox{background:var(--bg);border:1px solid var(--b0);border-radius:var(--r-sm);
+  padding:12px;margin-bottom:14px;}
+.txr{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--b0);}
+.txr:last-child{border:none;}
+.txk{font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;}
+.txv{font-size:11px;font-weight:500;text-align:right;max-width:60%;overflow:hidden;text-overflow:ellipsis;}
+.modal-btns{display:flex;flex-direction:column;gap:8px;}
+.btn-mm{padding:13px;background:rgba(245,130,32,.1);border:1px solid rgba(245,130,32,.25);
+  color:#f58220;border-radius:var(--r);font-family:var(--fd);font-size:13px;font-weight:800;
+  cursor:pointer;width:100%;transition:all .15s;}
+.btn-mm:hover{background:rgba(245,130,32,.18);}
+.btn-dl{padding:11px;background:var(--card2);border:1px solid var(--b0);color:var(--t1);
+  border-radius:var(--r);font-family:var(--fi);font-size:12px;font-weight:600;
+  cursor:pointer;width:100%;transition:all .15s;text-decoration:none;display:block;text-align:center;}
+.btn-dl:hover{color:var(--t0);border-color:var(--b1);}
+.mfoot{font-size:9px;color:var(--t2);line-height:1.6;border-top:1px solid var(--b0);padding-top:10px;margin-top:4px;}
+
+@keyframes flashUp{0%{background:rgba(0,184,148,.15)}100%{background:transparent}}
+@keyframes flashDown{0%{background:rgba(214,48,49,.15)}100%{background:transparent}}
+
+@media(max-width:480px){
+  .page{padding:16px 14px 40px;}
+  .mc-row{grid-template-columns:1fr;}
+  .tc-meta{grid-template-columns:1fr 1fr;}
+}
+</style>
 </head>
 <body>
-<div class="app">
 
 <!-- TOPBAR -->
 <div class="topbar">
@@ -37,167 +355,596 @@
     <span class="wm">METABOT</span>
   </div>
   <div class="tb-r">
-    <div class="stat"><span class="sl">ETH</span><span class="sv" id="ethP">$—</span></div>
-    <div class="stat"><span class="sl">GWEI</span><span class="sv" id="gasP">—</span></div>
-    <button class="wallet-btn" id="walletBtn" onclick="connectWallet()">Connect Wallet</button>
-    <span id="clk">--:--:--</span>
+    <div class="tb-stat"><span class="tb-l">ETH</span><span class="tb-v" id="ethP">$—</span></div>
+    <div class="tb-stat"><span class="tb-l">GWEI</span><span class="tb-v" id="gasP">—</span></div>
+    <button class="wb" id="walletBtn" onclick="connectWallet()">Connect Wallet</button>
   </div>
 </div>
 
-<!-- LAYOUT -->
-<div class="layout">
+<!-- PAGE -->
+<div class="page">
 
-  <!-- LEFT: FORM -->
-  <div class="col-left">
+  <!-- URL BAR -->
+  <div class="url-bar">
+    <input type="text" id="urlIn" class="url-in"
+      placeholder="Paste any ETH mint link or 0x contract address…"/>
+    <button class="url-btn" id="fetchBtn">→</button>
+  </div>
+  <p class="url-hint">
+    <span>opensea.io</span> · <span>zora.co</span> · <span>mint.fun</span> ·
+    <span>foundation.app</span> · <span>manifold.xyz</span> · <span>0x contract</span>
+  </p>
+  <div class="status-msg" id="statusMsg"></div>
 
-    <!-- CONTRACT -->
-    <div>
-      <span class="lbl">Contract Address</span>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="cAddr" placeholder="0x…" style="flex:1;"/>
-        <button class="btn-analyze" id="analyzeBtn" onclick="analyze()">Analyze</button>
+  <!-- COLLECTION CARD -->
+  <div class="col-card" id="colCard">
+    <div class="col-banner" id="colBanner">
+      <img id="colBannerImg" src="" alt="" style="display:none;"/>
+      <div class="col-banner-overlay">
+        <div id="colThumbWrap"></div>
+        <div class="col-info">
+          <div class="col-name" id="colName">—</div>
+          <a class="col-addr" id="colAddr" href="#" target="_blank" rel="noopener">
+            <span id="colAddrText">—</span>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </div>
       </div>
     </div>
 
-    <!-- ANALYSIS RESULT -->
-    <div class="analysis" id="analysisPanel">
-      <div class="analysis-row">
-        <span class="analysis-key">Mint Price</span>
-        <span class="analysis-val" id="aPrice">—</span>
+    <div class="col-body">
+      <!-- PROGRESS -->
+      <div class="progress-row">
+        <span class="progress-label" id="progressLabel">0% minted</span>
+        <span class="progress-val" id="progressVal">0 / —</span>
       </div>
-      <div class="analysis-row">
-        <span class="analysis-key">Function</span>
-        <span class="analysis-val" id="aFn">—</span>
-      </div>
-      <div class="analysis-row">
-        <span class="analysis-key">Max Supply</span>
-        <span class="analysis-val" id="aSupply">—</span>
-      </div>
-      <div class="analysis-row">
-        <span class="analysis-key">Total Minted</span>
-        <span class="analysis-val" id="aMinted">—</span>
-      </div>
-      <div class="analysis-row">
-        <span class="analysis-key">Paused</span>
-        <span class="analysis-val" id="aPaused">—</span>
-      </div>
-      <div class="analysis-row">
-        <span class="analysis-key">Risk</span>
-        <span class="analysis-val" id="aRisk">—</span>
-      </div>
-    </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
 
-    <!-- MINT FUNCTION OVERRIDE -->
-    <div>
-      <span class="lbl">Mint Function</span>
-      <input type="text" id="mFn" value="mint(uint256)"/>
-      <p class="note">Auto-detected on Analyze · override if needed</p>
-    </div>
+      <!-- LINKS -->
+      <div class="col-links" id="colLinks"></div>
 
-    <div class="g2">
-      <div>
-        <span class="lbl">Quantity</span>
+      <!-- PHASES -->
+      <div class="phases-title">Mint Phases</div>
+      <div id="phaseList"></div>
+    </div>
+  </div>
+
+  <!-- MINT CONFIG -->
+  <div class="mint-config" id="mintConfig">
+    <div class="mc-title">Configure Mint</div>
+    <div class="mc-row">
+      <div class="mc-field">
+        <label>Wallet Address</label>
+        <input type="text" id="mAddr" placeholder="0x… (auto-filled on connect)"/>
+      </div>
+      <div class="mc-field">
+        <label>Quantity</label>
         <input type="number" id="mQty" value="1" min="1"/>
       </div>
-      <div>
-        <span class="lbl">Price (ETH)</span>
-        <input type="number" id="mPrc" value="0" step="0.0001"/>
-      </div>
     </div>
-
-    <div class="g2">
-      <div>
-        <span class="lbl">Max Gas (gwei)</span>
+    <div class="mc-row">
+      <div class="mc-field">
+        <label>Max Gas (gwei)</label>
         <input type="number" id="mGas" value="50"/>
       </div>
-      <div>
-        <span class="lbl">Priority Tip</span>
+      <div class="mc-field">
+        <label>Priority Tip (gwei)</label>
         <input type="number" id="mTip" value="2" step="0.1"/>
       </div>
     </div>
 
     <div>
-      <span class="lbl">Bot Mode</span>
-      <div class="mtabs" id="modeBar">
-        <button class="mtab on" data-mode="scheduled">SCHED</button>
-        <button class="mtab" data-mode="sniper">SNIPER</button>
-        <button class="mtab" data-mode="manual">MANUAL</button>
+      <div style="font-size:9px;font-weight:700;color:var(--t2);letter-spacing:.09em;text-transform:uppercase;margin-bottom:6px;">Bot Mode</div>
+      <div class="mode-tabs" id="modeBar">
+        <button class="mode-tab on" data-mode="manual">MANUAL</button>
+        <button class="mode-tab" data-mode="scheduled">SCHEDULE</button>
+        <button class="mode-tab" data-mode="sniper">SNIPER</button>
       </div>
-      <p class="mnote" id="mNote">Fires at the scheduled time</p>
+      <div class="mode-note" id="modeNote">Opens wallet immediately — you sign to mint</div>
     </div>
 
-    <div id="schFld">
-      <span class="lbl">Mint Time (Local)</span>
+    <div class="sched-row" id="schedRow" style="display:none;">
+      <label>Mint Time (Local)</label>
       <input type="datetime-local" id="mTime"/>
     </div>
+  </div>
 
-    <button class="btn-primary" id="addTask">+ Add to Queue</button>
-    <button class="btn-secondary" id="mintNowBtn" onclick="mintNow()" style="margin-top:-4px;">
-      ⚡ Mint Now (connected wallet)
-    </button>
+  <!-- MINT BUTTON -->
+  <button class="mint-btn" id="mintBtn">⚡ Mint Now</button>
+  <button class="queue-btn" id="queueBtn">+ Add to Task Queue</button>
+  <div class="limit-note" id="limitNote">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span id="limitText">—</span>
+  </div>
 
+  <!-- TASK QUEUE -->
+  <div class="queue-section" id="queueSection">
+    <div class="queue-header">
+      <span class="queue-title">Task Queue</span>
+      <span class="queue-cnt" id="queueCnt">0 tasks</span>
+    </div>
+    <div id="taskList"></div>
+  </div>
+
+  <!-- LOG -->
+  <div class="log-section">
     <div class="log" id="botLog">
-      <div class="le info"><span class="ts">[--:--]</span>METABOT ready — connect wallet to mint on-chain.</div>
+      <div class="le info"><span class="ts">[--:--]</span>METABOT ready — paste a mint link above to begin.</div>
     </div>
-
   </div>
 
-  <!-- RIGHT: TASKS + MINT DIRECT -->
-  <div class="col-right">
-
-    <div class="tasks-area">
-      <div class="th">
-        <span class="tt">Task Queue</span>
-        <span class="tcnt" id="tskCnt">0 tasks</span>
-      </div>
-      <div id="actTasks">
-        <div class="empty">
-          <div class="empty-ico">⚡</div>
-          <div class="empty-h">No tasks queued</div>
-          <div class="empty-p">Add a task from the form, or use Mint Direct below.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="md-area">
-      <div class="md-head">
-        <span class="md-title">Mint Direct</span>
-      </div>
-      <div class="md-row">
-        <input type="text" id="mdUrl" class="md-in" placeholder="Paste any ETH mint link or 0x contract…"/>
-        <button class="md-fetch" id="mdFetch">🔍 Fetch</button>
-      </div>
-      <p class="md-hint">opensea.io · zora.co · mint.fun · foundation.app · manifold.xyz · 0x contract</p>
-      <div class="md-result" id="mdResult">
-        <div class="md-grid" id="mdMeta"></div>
-        <div class="md-btns">
-          <button class="md-mint" id="mdMintNow">⚡ Mint Now</button>
-          <button class="md-q" id="mdQueue">+ Add to Queue</button>
-        </div>
-      </div>
-      <div class="md-st" id="mdStatus"></div>
-    </div>
-
-  </div>
-</div>
 </div>
 
 <!-- WALLET MODAL -->
 <div class="ov" id="overlay">
   <div class="modal">
-    <button class="mcls" id="mdClose">✕</button>
-    <h2>Ready to Mint ⚡</h2>
-    <p id="modalDesc">Connect MetaMask to sign on-chain, or use a wallet deep-link.</p>
-    <div class="txbox" id="txPrev"></div>
-    <div class="modal-btns" id="modalBtns">
-      <button class="btn-mm" id="btnSignMM" onclick="signWithMetaMask()">Sign with MetaMask</button>
-      <a class="btn-deeplink" id="btnRainbow" href="#" target="_blank" rel="noopener">Open in Rainbow</a>
-      <a class="btn-deeplink" id="btnTrust" href="#" target="_blank" rel="noopener">Open in Trust Wallet</a>
+    <button class="mcls" id="modalClose">✕</button>
+    <h2>⚡ Ready to Mint</h2>
+    <p id="modalDesc">Review the transaction and sign with your wallet.</p>
+    <div class="txbox" id="txPreview"></div>
+    <div class="modal-btns">
+      <button class="btn-mm" id="btnMM" onclick="signWithMM()">Sign with MetaMask</button>
+      <a class="btn-dl" id="btnRainbow" href="#" target="_blank" rel="noopener">Open in Rainbow</a>
+      <a class="btn-dl" id="btnTrust" href="#" target="_blank" rel="noopener">Open in Trust Wallet</a>
     </div>
-    <div class="mfoot">Transaction calldata is pre-built. Review in your wallet before signing.</div>
+    <div class="mfoot">Calldata is pre-built. Review in your wallet before signing. Keys never leave your device.</div>
   </div>
 </div>
 
-<script src="app.js"></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const S={provider:null,signer:null,addr:null,ethPrice:0,gasPrice:0,tasks:[],mode:'manual',pending:null};
+const COL={contract:null,name:'',price:0,supply:0,minted:0,slug:'',platform:'',phases:[]};
+
+/* ── PRICES ── */
+let _prev=0;
+async function loadPrices(){
+  try{const c=JSON.parse(localStorage.getItem('mb_p')||'{}');if(c.eth)_setEth(c.eth);}catch(e){}
+  try{
+    const r=await Promise.race([fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'),new Promise((_,rej)=>setTimeout(rej,5e3))]);
+    const d=await r.json();const p=d.ethereum.usd;
+    _setEth(p);S.ethPrice=p;localStorage.setItem('mb_p',JSON.stringify({eth:p}));
+  }catch(e){
+    try{const r=await fetch('https://api.coincap.io/v2/assets/ethereum');const d=await r.json();_setEth(parseFloat(d.data.priceUsd));}catch(e2){}
+  }
+}
+function _setEth(p){
+  const el=$('ethP');if(!el||!p)return;
+  const up=p>_prev;
+  el.textContent='$'+p.toLocaleString('en-US',{maximumFractionDigits:0});
+  if(_prev&&p!==_prev){
+    el.className='tb-v '+(up?'up':'down');
+    el.parentElement.style.animation='none';void el.parentElement.offsetHeight;
+    el.parentElement.style.animation=(up?'flashUp':'flashDown')+' .6s ease';
+    setTimeout(()=>{el.className='tb-v';el.parentElement.style.animation='';},700);
+  }
+  _prev=p;S.ethPrice=p;
+}
+async function loadGas(){
+  try{
+    const r=await fetch('https://ethereum.publicnode.com',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'eth_gasPrice',params:[],id:1})});
+    const d=await r.json();
+    if(d.result){const g=Math.round(parseInt(d.result,16)/1e9);S.gasPrice=g;$('gasP').textContent=g;}
+  }catch(e){}
+}
+
+/* ── CLOCK ── */
+function tick(){$('clk').textContent=new Date().toLocaleTimeString('en-US',{hour12:false});}
+
+/* ── LOG ── */
+function log(msg,t=''){
+  const d=document.createElement('div');d.className='le '+(t||'');
+  d.innerHTML=`<span class="ts">[${new Date().toLocaleTimeString('en-US',{hour12:false})}]</span>${msg}`;
+  const l=$('botLog');l.insertBefore(d,l.firstChild);
+  while(l.children.length>60)l.removeChild(l.lastChild);
+}
+
+/* ── STATUS ── */
+function setStatus(msg,t=''){
+  const el=$('statusMsg');
+  el.textContent=msg;
+  el.className='status-msg '+(t||'');
+}
+
+/* ── WALLET ── */
+async function connectWallet(){
+  if(typeof ethers==='undefined'){log('ethers.js still loading — retry in a moment','warn');return;}
+  if(!window.ethereum){alert('MetaMask not detected.');return;}
+  try{
+    S.provider=new ethers.providers.Web3Provider(window.ethereum);
+    await S.provider.send('eth_requestAccounts',[]);
+    S.signer=S.provider.getSigner();
+    S.addr=await S.signer.getAddress();
+    $('walletBtn').textContent=S.addr.slice(0,6)+'…'+S.addr.slice(-4);
+    $('walletBtn').classList.add('connected');
+    $('mAddr').value=S.addr;
+    log('Wallet: '+S.addr,'ok');
+  }catch(e){log('Wallet error: '+e.message,'err');}
+}
+
+/* ── URL PARSER ── */
+function parseUrl(raw){
+  raw=raw.trim();
+  if(raw.match(/^0x[a-fA-F0-9]{40}$/))return{type:'contract',value:raw,platform:'direct'};
+  const maps=[
+    [/opensea\.io\/collection\/([^/?#\s]+)/,'opensea','slug'],
+    [/opensea\.io\/assets\/ethereum\/(0x[a-fA-F0-9]{40})/,'opensea','contract'],
+    [/zora\.co\/collect\/(?:zora|eth):(0x[a-fA-F0-9]{40})/,'zora','contract'],
+    [/zora\.co\/([^/?#\s]+)/,'zora','slug'],
+    [/mint\.fun\/(0x[a-fA-F0-9]{40})/,'mintfun','contract'],
+    [/foundation\.app\/@[^/]+\/([^/?#\s]+)/,'foundation','slug'],
+    [/app\.manifold\.xyz\/c\/([^/?#\s]+)/,'manifold','slug'],
+    [/manifold\.gallery\/collection\/([^/?#\s]+)/,'manifold','slug'],
+    [/nft\.coinbase\.com\/collection\/ethereum\/(0x[a-fA-F0-9]{40})/,'coinbase','contract'],
+    [/rarible\.com\/collection\/(0x[a-fA-F0-9]{40})/,'rarible','contract'],
+    [/superrare\.com\/([^/?#\s]+)/,'superrare','slug'],
+  ];
+  for(const[re,platform,type]of maps){const m=raw.match(re);if(m)return{type,value:m[1],platform};}
+  if(raw.length>5&&!raw.includes(' '))return{type:'slug',value:raw,platform:'opensea'};
+  return null;
+}
+
+/* ── FETCH COLLECTION ── */
+$('fetchBtn').addEventListener('click',fetchCollection);
+$('urlIn').addEventListener('keydown',e=>{if(e.key==='Enter')fetchCollection();});
+
+async function fetchCollection(){
+  const raw=$('urlIn').value.trim();
+  if(!raw){setStatus('Paste a mint link or 0x contract.','err');return;}
+  const parsed=parseUrl(raw);
+  if(!parsed){setStatus('Unrecognised link — try pasting the 0x contract directly.','err');return;}
+
+  setStatus('Fetching collection…','loading');
+  $('colCard').classList.remove('show');
+  $('mintConfig').classList.remove('show');
+  $('mintBtn').classList.remove('show');
+  $('queueBtn').classList.remove('show');
+
+  try{
+    let contract=null,name='Collection',image='',banner='',supply=0,minted=0,floor=0,twitterUrl='',osUrl='';
+
+    if(parsed.type==='contract'){
+      contract=parsed.value;
+      // Read name() from chain
+      try{
+        const r=await fetch('https://ethereum.publicnode.com',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data:'0x06fdde03'},'latest'],id:1})});
+        const d=await r.json();
+        if(d.result&&d.result.length>66){
+          const hex=d.result.slice(130);
+          const decoded=hex.match(/../g)?.map(b=>String.fromCharCode(parseInt(b,16))).join('').replace(/\x00/g,'').trim();
+          if(decoded&&decoded.length>1)name=decoded;
+        }
+      }catch(e){}
+      // Read totalSupply() and maxSupply()
+      try{
+        const calls=[
+          {id:'ts',data:'0x18160ddd'},
+          {id:'ms',data:'0xd5abeb01'},
+          {id:'mp',data:'0xa0712d68'},
+        ];
+        const results=await Promise.all(calls.map(async c=>{
+          const r=await fetch('https://ethereum.publicnode.com',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data:c.data},'latest'],id:1})});
+          return(await r.json()).result;
+        }));
+        if(results[0]&&results[0]!=='0x')minted=parseInt(results[0],16);
+        if(results[1]&&results[1]!=='0x')supply=parseInt(results[1],16);
+        if(results[2]&&results[2]!=='0x')floor=parseInt(results[2],16)/1e18;
+      }catch(e){}
+    } else {
+      // Slug — try OpenSea API
+      const osEndpoint='https://api.opensea.io/api/v2/collections/'+parsed.value;
+      for(const px of['https://corsproxy.io/?url=','https://api.allorigins.win/raw?url=']){
+        try{
+          const r=await fetch(px+encodeURIComponent(osEndpoint),{headers:{Accept:'application/json'}});
+          const d=await r.json();
+          if(d&&!d.errors&&d.name){
+            name=d.name;
+            image=d.image_url||'';
+            banner=d.banner_image_url||d.image_url||'';
+            twitterUrl=d.twitter_username?'https://x.com/'+d.twitter_username:'';
+            osUrl='https://opensea.io/collection/'+d.collection;
+            contract=d.contracts?.[0]?.address||null;
+            supply=d.total_supply?parseInt(d.total_supply):0;
+            // Get stats
+            try{
+              const sr=await fetch(px+encodeURIComponent('https://api.opensea.io/api/v2/collections/'+d.collection+'/stats'),{headers:{Accept:'application/json'}});
+              const sd=await sr.json();
+              floor=sd.total?.floor_price||0;
+              minted=sd.total?.num_owners||0;
+            }catch(e){}
+            break;
+          }
+        }catch(e){}
+      }
+    }
+
+    if(!contract?.match(/^0x[a-fA-F0-9]{40}$/)){
+      setStatus('Could not resolve contract — paste the 0x address directly.','err');
+      return;
+    }
+
+    // Store
+    COL.contract=contract;COL.name=name;COL.price=floor;
+    COL.supply=supply;COL.minted=minted;COL.slug=parsed.value;COL.platform=parsed.platform;
+
+    // Render collection card
+    renderColCard({name,image,banner,contract,supply,minted,floor,twitterUrl,osUrl});
+    setStatus('');
+
+    // Show mint config
+    $('mintConfig').classList.add('show');
+    $('mintBtn').classList.add('show');
+    $('queueBtn').classList.add('show');
+    if(floor>0){
+      // Show wallet limit info if we have supply data
+      if(supply>0){
+        $('limitNote').classList.add('show');
+        $('limitText').textContent=supply.toLocaleString()+' total supply · '+(supply-minted).toLocaleString()+' remaining';
+      }
+    }
+    log('Loaded: '+name+' ('+contract.slice(0,10)+'…) via '+parsed.platform,'ok');
+  }catch(e){
+    setStatus('Error: '+e.message,'err');
+    log('Fetch error: '+e.message,'err');
+  }
+}
+
+function renderColCard({name,image,banner,contract,supply,minted,floor,twitterUrl,osUrl}){
+  $('colName').textContent=name;
+  $('colAddrText').textContent=contract.slice(0,6)+'…'+contract.slice(-4).toUpperCase();
+  $('colAddr').href='https://etherscan.io/address/'+contract;
+
+  // Banner
+  if(banner){
+    const bi=$('colBannerImg');bi.src=banner;bi.style.display='block';
+  }
+
+  // Thumb
+  const tw=$('colThumbWrap');
+  if(image){
+    tw.innerHTML=`<img src="${image}" class="col-thumb" onerror="this.parentElement.innerHTML='<div class=col-thumb-ph>${name.charAt(0)}</div>'"/>`;
+  }else{
+    tw.innerHTML=`<div class="col-thumb-ph">${name.charAt(0)}</div>`;
+  }
+
+  // Progress
+  const pct=supply>0?Math.min(100,Math.round(minted/supply*100)):0;
+  $('progressFill').style.width=pct+'%';
+  $('progressLabel').textContent=pct+'% minted';
+  $('progressVal').textContent=minted.toLocaleString()+(supply>0?' / '+supply.toLocaleString():'');
+
+  // Links
+  const links=[];
+  if(osUrl)links.push(`<a class="col-link" href="${osUrl}" target="_blank" rel="noopener">↗ OpenSea</a>`);
+  if(twitterUrl)links.push(`<a class="col-link" href="${twitterUrl}" target="_blank" rel="noopener">𝕏 Twitter</a>`);
+  links.push(`<a class="col-link" href="https://etherscan.io/address/${contract}" target="_blank" rel="noopener">↗ Etherscan</a>`);
+  $('colLinks').innerHTML=links.join('');
+
+  // Phases
+  const phases=[
+    {name:'PUBLIC MINT',price:floor,live:true,eligible:supply>minted},
+  ];
+  if(floor===0)phases[0].name='FREE MINT';
+  $('phaseList').innerHTML=phases.map((ph,i)=>`
+    <div class="phase${i===0?' selected':''}" onclick="selectPhase(${i})">
+      <div class="phase-top">
+        <span class="phase-name">${ph.name}</span>
+        <span class="phase-timer ${ph.live?'live':'soon'}">${ph.live?'LIVE':'UPCOMING'}</span>
+      </div>
+      <div class="phase-meta">
+        <span class="phase-pill eth">PRICE · ${ph.price>0?ph.price.toFixed(4)+' Ξ':'FREE'}</span>
+        <span class="phase-pill">SUPPLY · ${supply>0?supply.toLocaleString():'—'}</span>
+        ${ph.eligible?'<span class="phase-pill">ELIGIBLE</span>':''}
+      </div>
+    </div>`).join('');
+
+  // Auto-fill price
+  // (no price field in new layout — uses COL.price)
+  $('colCard').classList.add('show');
+}
+
+function selectPhase(i){
+  document.querySelectorAll('.phase').forEach((p,j)=>p.classList.toggle('selected',j===i));
+}
+
+/* ── MODE TABS ── */
+document.querySelectorAll('#modeBar .mode-tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#modeBar .mode-tab').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');S.mode=b.dataset.mode;
+  const notes={manual:'Opens wallet immediately — you sign to mint',scheduled:'Fires at the scheduled time',sniper:'Polls contract every 10s — fires the instant mint goes live'};
+  $('modeNote').textContent=notes[S.mode];
+  $('schedRow').style.display=S.mode==='scheduled'?'block':'none';
+}));
+
+/* ── CALLDATA ── */
+function kH(s){let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=(h*0x01000193)>>>0;}return h.toString(16).padStart(8,'0');}
+function buildData(fn,qty){
+  if(typeof ethers==='undefined')return'0x1249c58b'+'0'.repeat(64);
+  const sel=ethers.utils.id(fn).slice(0,10);
+  const enc=ethers.utils.defaultAbiCoder.encode(['uint256'],[qty]);
+  return sel+enc.slice(2);
+}
+
+/* ── MINT NOW ── */
+$('mintBtn').addEventListener('click',()=>{
+  if(!COL.contract){setStatus('Fetch a collection first.','err');return;}
+  const addr=$('mAddr').value.trim()||S.addr;
+  if(!addr?.match(/^0x[a-fA-F0-9]{40}$/)){
+    setStatus('Enter your wallet address in the config above.','err');
+    $('mintConfig').classList.add('show');
+    $('mAddr').focus();
+    return;
+  }
+  const t=buildTask(addr);
+  if(S.mode==='manual'){openModal(t);}
+  else if(S.mode==='scheduled'){
+    t.status='waiting';S.tasks.unshift(t);renderTasks();
+    log('[SCHED] Queued for '+new Date(t.time).toLocaleTimeString(),'ok');
+  }else{
+    t.status='watching';S.tasks.unshift(t);renderTasks();
+    log('[SNIPER] Watching '+COL.contract.slice(0,12)+'…','ok');
+  }
+});
+
+$('queueBtn').addEventListener('click',()=>{
+  if(!COL.contract){setStatus('Fetch a collection first.','err');return;}
+  const addr=$('mAddr').value.trim()||S.addr;
+  if(!addr?.match(/^0x[a-fA-F0-9]{40}$/)){
+    $('mintConfig').classList.add('show');
+    $('mAddr').focus();
+    setStatus('Enter your wallet address first.','err');return;
+  }
+  const t=buildTask(addr);
+  t.status='waiting';S.tasks.unshift(t);renderTasks();
+  log('Queued: '+COL.name+' ×'+t.qty,'ok');
+});
+
+function buildTask(addr){
+  return{
+    id:Date.now(),addr,contract:COL.contract,name:COL.name,
+    fn:'mint(uint256)',qty:parseInt($('mQty').value)||1,
+    price:COL.price,maxGas:parseInt($('mGas').value)||50,
+    tip:parseFloat($('mTip').value)||2,mode:S.mode,
+    time:S.mode==='scheduled'?new Date($('mTime').value):null,
+    status:'ready'
+  };
+}
+
+/* ── RENDER TASKS ── */
+function fmtCD(t){const d=new Date(t)-new Date();if(d<=0)return'NOW';const h=Math.floor(d/36e5),m=Math.floor((d/6e4)%60),s=Math.floor((d/1e3)%60);return h>0?`${h}h ${m}m`:`${m}m ${s}s`;}
+
+function renderTasks(){
+  $('queueCnt').textContent=S.tasks.length+' task'+(S.tasks.length!==1?'s':'');
+  const el=$('taskList');
+  if(!S.tasks.length){$('queueSection').classList.remove('show');return;}
+  $('queueSection').classList.add('show');
+  el.innerHTML=S.tasks.map(t=>`
+    <div class="task-card ${t.status}">
+      <div class="tc-top">
+        <div class="tc-addr">${t.name||t.contract.slice(0,12)+'…'} ×${t.qty}</div>
+        <span class="tc-badge ${t.status}">${t.status.toUpperCase()}</span>
+      </div>
+      <div class="tc-meta">
+        <div class="tc-m"><span class="lk">Mode</span><span class="lv">${t.mode.toUpperCase()}</span></div>
+        <div class="tc-m"><span class="lk">Price</span><span class="lv">${t.price>0?t.price.toFixed(4)+'Ξ':'FREE'}</span></div>
+        <div class="tc-m"><span class="lk">Gas</span><span class="lv">${t.maxGas}</span></div>
+        <div class="tc-m"><span class="lk">${t.mode==='scheduled'?'Fires In':'State'}</span><span class="lv hi">${t.time?fmtCD(t.time):t.mode==='sniper'?'WATCHING':'NOW'}</span></div>
+      </div>
+      <div class="tc-acts">
+        <button class="tc-btn fire" data-id="${t.id}" data-a="fire">⚡ Fire</button>
+        <button class="tc-btn del" data-id="${t.id}" data-a="del">✕ Remove</button>
+      </div>
+    </div>`).join('');
+  el.querySelectorAll('.tc-btn').forEach(b=>b.addEventListener('click',()=>{
+    const t=S.tasks.find(x=>x.id==b.dataset.id);if(!t)return;
+    if(b.dataset.a==='fire'){t.status='ready';openModal(t);}
+    if(b.dataset.a==='del'){S.tasks=S.tasks.filter(x=>x.id!=b.dataset.id);renderTasks();}
+  }));
+}
+
+/* ── SNIPER ── */
+function tickTasks(){
+  S.tasks.forEach(t=>{
+    if(t.mode==='scheduled'&&t.time&&t.status==='waiting'&&new Date()>=t.time){
+      t.status='ready';log('⚡ FIRED: '+t.name,'ok');openModal(t);
+    }
+    if(t.mode==='sniper'&&t.status==='watching'){
+      const now=Math.floor(Date.now()/1e3);
+      if(!t._p||now-t._p>=10){
+        t._p=now;
+        fetch('https://ethereum.publicnode.com',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({jsonrpc:'2.0',method:'eth_call',params:[{to:t.contract,data:'0x1249c58b'},'latest'],id:1})})
+          .then(r=>r.json()).then(d=>{
+            if(d.result!==undefined&&!d.error){
+              t.status='ready';log('⚡ SNIPER HIT: '+t.name+' LIVE','ok');openModal(t);
+            }
+            renderTasks();
+          }).catch(()=>{});
+      }
+    }
+  });
+  renderTasks();
+}
+
+/* ── MODAL ── */
+function openModal(t){
+  S.pending=t;
+  const tot=t.price*t.qty;
+  const data=buildData(t.fn,t.qty);
+  const vW=typeof ethers!=='undefined'?ethers.utils.parseEther(tot.toFixed(8)).toString():'0';
+  $('txPreview').innerHTML=[
+    ['Collection',t.name||'—'],
+    ['Contract',t.contract.slice(0,14)+'…'+t.contract.slice(-4)],
+    ['Qty / Value',`${t.qty} × ${t.price>0?t.price.toFixed(4):'0'}Ξ = ${tot.toFixed(4)}Ξ${S.ethPrice?' (~$'+(tot*S.ethPrice).toFixed(2)+')':''}`],
+    ['Gas',`${t.maxGas} gwei max · ${t.tip} gwei tip`],
+  ].map(([k,v])=>`<div class="txr"><span class="txk">${k}</span><span class="txv">${v}</span></div>`).join('');
+  if(S.signer){$('modalDesc').textContent='MetaMask connected — sign on-chain directly.';$('btnMM').style.display='block';}
+  else{$('modalDesc').textContent='Connect MetaMask or open in a wallet app.';$('btnMM').style.display='none';}
+  $('btnRainbow').href=`https://rnbwapp.com/wc?uri=${encodeURIComponent('ethereum:'+t.contract+'@1?value='+vW+'&data='+data)}`;
+  $('btnTrust').href=`trust://send?address=${t.contract}&amount=${tot}&coin=60&data=${data}`;
+  $('overlay').classList.add('open');
+  log('Modal ready for '+t.name,'info');
+}
+
+async function signWithMM(){
+  const t=S.pending;if(!t||!S.signer)return;
+  const tot=t.price*t.qty;
+  const data=buildData(t.fn,t.qty);
+  const value=ethers.utils.parseEther(tot.toFixed(8));
+  const maxFeePerGas=ethers.utils.parseUnits(t.maxGas.toString(),'gwei');
+  const maxPriorityFeePerGas=ethers.utils.parseUnits(t.tip.toString(),'gwei');
+  try{
+    log('Confirm in MetaMask…','warn');
+    const tx=await S.signer.sendTransaction({to:t.contract,value,data,maxFeePerGas,maxPriorityFeePerGas,gasLimit:300000});
+    $('overlay').classList.remove('open');
+    log('TX: <a style="color:var(--acc2)" href="https://etherscan.io/tx/'+tx.hash+'" target="_blank">'+tx.hash.slice(0,18)+'…</a>','ok');
+    S.tasks=S.tasks.filter(x=>x.id!==t.id);renderTasks();
+    tx.wait().then(r=>log('✓ Confirmed! Block '+r.blockNumber,'ok')).catch(e=>log('TX failed: '+e.message,'err'));
+  }catch(e){
+    if(e.code===4001)log('Rejected','warn');
+    else log('Error: '+(e.reason||e.message),'err');
+  }
+}
+
+$('modalClose').onclick=()=>$('overlay').classList.remove('open');
+$('overlay').onclick=e=>{if(e.target.id==='overlay')$('overlay').classList.remove('open');};
+
+/* ── INIT ── */
+/* ── THEME TOGGLE ── */
+function toggleTheme(){
+  const isDark=document.body.classList.toggle('dark');
+  $('themeIcon').textContent=isDark?'☽':'○';
+  localStorage.setItem('mb_theme',isDark?'dark':'light');
+}
+// Restore saved theme — default is light
+(function(){
+  const saved=localStorage.getItem('mb_theme');
+  if(saved==='dark'){
+    document.body.classList.add('dark');
+    const ic=document.getElementById('themeIcon');
+    if(ic)ic.textContent='☽';
+  } else {
+    // default light — icon is ○
+    const ic=document.getElementById('themeIcon');
+    if(ic)ic.textContent='○';
+  }
+})();
+
+function waitForEthers(cb,n=0){
+  if(typeof ethers!=='undefined')return cb();
+  if(n>40)return cb();
+  setTimeout(()=>waitForEthers(cb,n+1),150);
+}
+async function init(){
+  tick();setInterval(tick,1e3);setInterval(tickTasks,1e3);
+  setInterval(loadPrices,30e3);setInterval(loadGas,30e3);
+  const t=new Date(Date.now()+3600e3);$('mTime').value=t.toISOString().slice(0,16);
+  await Promise.all([loadPrices(),loadGas()]);
+}
+waitForEthers(()=>init());
+</script>
 </body>
 </html>
