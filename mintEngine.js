@@ -177,17 +177,29 @@ export async function executeMint(contractAddr, signer, qty, log, options = {}) 
           }
         }
 
+        // Estimate gas with 20% buffer
+        let gasLimit = 300000;
+        try {
+          const est = await contract.estimateGas[fn.name](...args, { value });
+          gasLimit = Math.ceil(est.toNumber() * 1.2);
+          log("Gas estimated: " + gasLimit);
+        } catch(e) {
+          log("Gas estimation failed — using 300k fallback", "warn");
+        }
+
         const tx = await contract[fn.name](...args, {
           value,
           maxFeePerGas,
           maxPriorityFeePerGas,
-          gasLimit: 300000
+          gasLimit
         });
 
         log("TX sent: " + tx.hash);
-        await tx.wait();
-        log("✅ Mint confirmed!");
-        return { success: true, hash: tx.hash };
+        const receipt = await tx.wait();
+        const gasUsed = receipt.gasUsed?.toString() || '?';
+        const block = receipt.blockNumber || '?';
+        log("✅ Mint confirmed! Block " + block + " · Gas used: " + gasUsed);
+        return { success: true, hash: tx.hash, block, gasUsed };
 
       } catch(err) {
         if (err.code === 4001) throw new Error("Rejected by user");
@@ -226,19 +238,29 @@ export async function executeMint(contractAddr, signer, qty, log, options = {}) 
         ? iface.encodeFunctionData(fnName, [qty])
         : iface.encodeFunctionData(fnName);
 
+      // Estimate gas with 20% buffer
+      let gasLimit = 300000;
+      try {
+        const est = await signer.estimateGas({ to: contractAddr, value: bruteValue, data });
+        gasLimit = Math.ceil(est.toNumber() * 1.2);
+        log("Gas estimated: " + gasLimit);
+      } catch(e) {}
+
       const tx = await signer.sendTransaction({
         to: contractAddr,
         value: bruteValue,
         data,
         maxFeePerGas,
         maxPriorityFeePerGas,
-        gasLimit: 300000
+        gasLimit
       });
 
       log("TX sent: " + tx.hash);
-      await tx.wait();
-      log("✅ Mint confirmed!");
-      return { success: true, hash: tx.hash };
+      const receipt = await tx.wait();
+      const gasUsed = receipt.gasUsed?.toString() || '?';
+      const block = receipt.blockNumber || '?';
+      log("✅ Mint confirmed! Block " + block + " · Gas used: " + gasUsed);
+      return { success: true, hash: tx.hash, block, gasUsed };
 
     } catch(err) {
       if (err.code === 4001) throw new Error("Rejected by user");
