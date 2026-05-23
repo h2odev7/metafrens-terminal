@@ -19,7 +19,8 @@ const S = {
 
 const COL = {
   contract: null, name: '', price: 0,
-  supply: 0, minted: 0, slug: '', platform: ''
+  supply: 0, minted: 0, slug: '', platform: '',
+  phases: [], soldOut: false
 };
 
 let _prevEth = 0;
@@ -404,6 +405,9 @@ async function fetchCollection() {
       return;
     }
 
+    // On-chain reads — only override API data if chain returns higher values
+    const apiMinted = minted;
+    const apiSupply = supply;
     try {
       const provider = window.ethereum
         ? new ethers.providers.Web3Provider(window.ethereum)
@@ -415,12 +419,23 @@ async function fetchCollection() {
       ];
       const con = new ethers.Contract(contract, abi, provider);
       try { const n = await con.name(); if (n && n.length > 0) name = n; } catch(e) {}
-      try { minted = (await con.totalSupply()).toNumber(); } catch(e) {}
-      try { const ms = (await con.maxSupply()).toNumber(); if (ms > 0) supply = ms; } catch(e) {}
+      try {
+        const ts = (await con.totalSupply()).toNumber();
+        // Only use on-chain value if it's credible (> 0 and close to API value)
+        if (ts > 0) minted = ts;
+      } catch(e) {}
+      try {
+        const ms = (await con.maxSupply()).toNumber();
+        if (ms > 0) supply = ms;
+      } catch(e) {}
     } catch(e) {}
 
-    COL.minted = minted > 0 ? minted : supply;
-    COL.supply = supply > 0 && supply >= COL.minted ? supply : 0;
+    // If on-chain returned 0 but API had real data, trust the API
+    if (minted === 0 && apiMinted > 0) minted = apiMinted;
+    if (supply === 0 && apiSupply > 0) supply = apiSupply;
+
+    COL.minted = minted > 0 ? minted : 0;
+    COL.supply = supply > 0 ? supply : 0;
     COL.contract = contract;
     COL.name = name;
     COL.price = floor;
@@ -430,30 +445,45 @@ async function fetchCollection() {
     renderColCard({ name, image, banner, contract, supply, minted, floor, twitterUrl, osUrl });
     setStatus('');
 
-    let detectedPrice = null;
-    try {
-      const provider = window.ethereum
-        ? new ethers.providers.Web3Provider(window.ethereum)
-        : new ethers.providers.JsonRpcProvider('https://ethereum.publicnode.com');
-      detectedPrice = await detectPrice(contract, provider);
-    } catch(e) {}
+    // Fetch phases and detect price in parallel
+    const [phases, detectedPrice] = await Promise.all([
+      parsed.type === 'slug' ? fetchMintPhases(parsed.value).catch(() => []) : Promise.resolve([]),
+      (async () => {
+        try {
+          const provider = window.ethereum
+            ? new ethers.providers.Web3Provider(window.ethereum)
+            : new ethers.providers.JsonRpcProvider('https://ethereum.publicnode.com');
+          return await detectPrice(contract, provider);
+        } catch(e) { return null; }
+      })()
+    ]);
+
+    COL.phases = phases;
 
     if (detectedPrice) {
       COL.price = parseFloat(detectedPrice);
       log('Price detected: ' + detectedPrice + ' ETH', 'ok');
     } else if (floor > 0) {
       COL.price = floor;
-      log('Price from OpenSea: ' + floor.toFixed(4) + ' ETH', 'info');
+      log('Price from API: ' + floor.toFixed(4) + ' ETH', 'info');
     } else {
-      log('Price not auto-detected', 'warn');
+      log('Price not auto-detected — enter manually', 'warn');
     }
-    // Re-render phase with confirmed price
-    renderPhase(COL.price, COL.supply);
+
+    // Render phases with full data
+    renderPhases(phases, COL.supply, COL.minted, detectedPrice);
+
+    // Sold out banner
+    if (COL.soldOut) {
+      setStatus('⚠️ This collection is SOLD OUT (' + minted.toLocaleString() + '/' + supply.toLocaleString() + ' minted)', 'warn');
+      log('SOLD OUT: ' + name, 'warn');
+    }
 
     $('limitNote').classList.remove('show');
-    if (supply > 0) {
+    if (COL.supply > 0) {
       $('limitNote').classList.add('show');
-      $('limitText').textContent = supply.toLocaleString() + ' total supply - ' + Math.max(0, supply - minted).toLocaleString() + ' remaining';
+      const remaining = Math.max(0, COL.supply - COL.minted);
+      $('limitText').textContent = COL.supply.toLocaleString() + ' total supply · ' + remaining.toLocaleString() + ' remaining';
     }
     log('Loaded: ' + name + ' (' + contract.slice(0, 10) + '...) via ' + COL.platform, 'ok');
   } catch(e) {
@@ -462,6 +492,118 @@ async function fetchCollection() {
   }
 }
 
+
+/* ══════════════════════════════════════
+   FETCH MINT PHASES from OpenSea
+══════════════════════════════════════ */
+async function fetchMintPhases(slug) {
+  try {
+    const d = await fetchWithFallback(
+      'https://api.opensea.io/api/v2/collections/' + slug + '/mint_stages',
+      { timeoutMs: 5000 }
+    );
+    if (d?.mint_stages?.length) return d.mint_stages;
+  } catch(e) {}
+
+  // Fallback: try Reservoir saleConfig
+  try {
+    const d = await fetchWithFallback(
+      'https://api.reservoir.tools/collections/v7?slug=' + encodeURIComponent(slug),
+      { timeoutMs: 5000 }
+    );
+    const col = d?.collections?.[0];
+    if (col?.saleConfig) {
+      const cfg = col.saleConfig;
+      return [{
+        stage: 'public-sale',
+        price: col.floorAsk?.price?.amount?.native || 0,
+        start_time: cfg.publicSaleStart ? new Date(cfg.publicSaleStart * 1000).toISOString() : null,
+        end_time: cfg.publicSaleEnd ? new Date(cfg.publicSaleEnd * 1000).toISOString() : null,
+        max_per_wallet: cfg.maxSalePurchasePerAddress || null,
+      }];
+    }
+  } catch(e) {}
+  return [];
+}
+
+function fmtPhaseTime(isoStr) {
+  if (!isoStr) return null;
+  const d = new Date(isoStr);
+  const now = new Date();
+  const diff = d - now;
+  if (diff <= 0) return null; // already started
+  const h = Math.floor(diff / 36e5);
+  const m = Math.floor((diff % 36e5) / 6e4);
+  if (h > 48) return 'Starts in ' + Math.floor(h/24) + 'd ' + (h%24) + 'h';
+  if (h > 0)  return 'Starts in ' + h + 'h ' + m + 'm';
+  return 'Starts in ' + m + 'm';
+}
+
+function renderPhases(phases, supply, minted, detectedPrice) {
+  const soldOut = supply > 0 && minted >= supply;
+  COL.soldOut = soldOut;
+
+  // Disable mint button if sold out
+  const mintBtn = $('mintBtn');
+  if (mintBtn) {
+    mintBtn.disabled = soldOut;
+    mintBtn.title = soldOut ? 'This collection is sold out' : '';
+  }
+
+  if (!phases || phases.length === 0) {
+    // Fallback single phase
+    renderPhase(detectedPrice || COL.price, supply, soldOut);
+    return;
+  }
+
+  const html = phases.map((ph, i) => {
+    const price = ph.price != null ? parseFloat(ph.price) : (detectedPrice ? parseFloat(detectedPrice) : 0);
+    const startTime = fmtPhaseTime(ph.start_time);
+    const isLive = !startTime; // no countdown = already started
+    const isSoldOut = soldOut && isLive;
+
+    let timerClass = isSoldOut ? 'sold-out' : isLive ? 'live' : 'soon';
+    let timerText  = isSoldOut ? 'SOLD OUT' : isLive ? 'LIVE' : startTime;
+
+    const stageName = (ph.stage || ph.name || (i === 0 ? 'PUBLIC MINT' : 'PHASE ' + (i+1)))
+      .replace(/-/g, ' ').toUpperCase();
+
+    return '<div class="phase' + (i === 0 ? ' selected' : '') + '" onclick="selectPhase(this,' + price + ',' + (ph.start_time ? JSON.stringify(ph.start_time) : 'null') + ')">' +
+      '<div class="phase-top">' +
+        '<span class="phase-name">' + stageName + '</span>' +
+        '<span class="phase-timer ' + timerClass + '">' + timerText + '</span>' +
+      '</div>' +
+      '<div class="phase-meta">' +
+        '<span class="phase-pill eth">PRICE · ' + (price > 0 ? price.toFixed(4) + ' Ξ' : 'FREE') + '</span>' +
+        '<span class="phase-pill">SUPPLY · ' + (supply > 0 ? supply.toLocaleString() : '—') + '</span>' +
+        (ph.max_per_wallet ? '<span class="phase-pill">MAX ' + ph.max_per_wallet + '/WALLET</span>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  $('phaseList').innerHTML = html;
+}
+
+window.selectPhase = function(el, price, startTime) {
+  document.querySelectorAll('.phase').forEach(p => p.classList.remove('selected'));
+  el.classList.add('selected');
+  // Update price and scheduled time from this phase
+  COL.price = price;
+  if (startTime) {
+    const t = new Date(startTime);
+    if ($('mTime')) $('mTime').value = t.toISOString().slice(0, 16);
+    // Auto-switch to scheduled mode if phase hasn't started
+    if (t > new Date()) {
+      document.querySelectorAll('#modeBar .mode-tab').forEach(b => {
+        b.classList.toggle('on', b.dataset.mode === 'scheduled');
+      });
+      S.mode = 'scheduled';
+      $('schedRow').style.display = 'block';
+      $('modeNote').textContent = 'Scheduled for phase start time';
+      log('Phase start time set: ' + t.toLocaleString(), 'info');
+    }
+  }
+};
 
 function renderPhase(price, supply) {
   const p = price > 0 ? parseFloat(price) : 0;
@@ -566,7 +708,11 @@ $('mintBtn').addEventListener('click', async () => {
       setStatus('Opening MetaMask for signature...');
       try {
         const result = await executeMint(task.contract, S.signer, task.qty, msg => log(msg, 'info'), task.options);
-        setStatus(result.success ? 'Mint successful' : 'Done', 'ok');
+        if (result.success) {
+          const link = '<a href="https://etherscan.io/tx/' + result.hash + '" target="_blank" rel="noopener">' + result.hash.slice(0,14) + '…</a>';
+          setStatus('Mint confirmed ✅', 'ok');
+          log('TX confirmed: ' + link + ' · Block ' + result.block, 'ok');
+        }
       } catch(e) {
         setStatus('Error: ' + e.message, 'err');
         log(e.message, 'err');
@@ -610,7 +756,14 @@ function fmtCD(t) {
   return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
 }
 
+function persistTasks() {
+  try {
+    localStorage.setItem('mb_tasks', JSON.stringify(S.tasks));
+  } catch(e) {}
+}
+
 function renderTasks() {
+  persistTasks();
   $('queueCnt').textContent = S.tasks.length + ' task' + (S.tasks.length !== 1 ? 's' : '');
   const el = $('taskList');
   if (!S.tasks.length) { $('queueSection').classList.remove('show'); return; }
@@ -788,6 +941,16 @@ window.togglePKSection = function() {
 };
 
 async function init() {
+  // Restore persisted tasks
+  try {
+    const saved = JSON.parse(localStorage.getItem('mb_tasks') || '[]');
+    if (Array.isArray(saved) && saved.length) {
+      // Restore time objects
+      S.tasks = saved.map(t => ({ ...t, time: t.time ? new Date(t.time) : null }));
+      renderTasks();
+      log('Restored ' + S.tasks.length + ' task(s) from previous session', 'info');
+    }
+  } catch(e) {}
   setInterval(tickTasks, 1000);
   setInterval(loadPrices, 30000);
   setInterval(loadGas, 30000);
