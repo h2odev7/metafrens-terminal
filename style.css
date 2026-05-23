@@ -221,6 +221,15 @@ body{
 .phase-timer{font-size:10px;padding:3px 8px;border-radius:20px;border:1px solid var(--b0);color:var(--t2);background:var(--bg);}
 .phase-timer.live{color:var(--ok);border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.08);}
 .phase-timer.soon{color:var(--warn);border-color:rgba(217,119,6,.25);}
+.phase-timer.sold-out{color:var(--err);border-color:rgba(220,38,38,.25);background:rgba(220,38,38,.06);}
+.phase{cursor:pointer;}
+.phase.selected{border-color:var(--acc);background:var(--acc-glow);}
+
+/* Sold out mint button */
+.mint-btn:disabled{
+  opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important;
+  border-color:var(--b1);color:var(--t2);
+}
 .phase-meta{display:flex;gap:8px;flex-wrap:wrap;}
 .phase-pill{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;background:var(--bg);border:1px solid var(--b0);color:var(--t1);}
 .phase-pill.eth{color:var(--acc);}
@@ -345,6 +354,8 @@ body{
 .le.err{color:var(--err);}
 .le.warn{color:var(--warn);}
 .le.info{color:var(--acc2);}
+.le a{color:var(--acc2);text-decoration:none;}
+.le a:hover{text-decoration:underline;}
 
 /* ── MODAL ── */
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:none;place-items:center;z-index:200;}
