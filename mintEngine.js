@@ -135,7 +135,8 @@ export async function executeMint(contractAddr, signer, qty, log, options = {}) 
       unitPrice = ethers.utils.parseEther(String(manualPrice));
       log("Price (manual): " + manualPrice + " ETH");
     } else {
-      unitPrice = await detectPrice(contract);
+      const detected = await detectPrice(contractAddr, signer.provider);
+      unitPrice = detected ? ethers.utils.parseEther(detected) : ethers.utils.parseEther("0");
       log("Price (detected): " + ethers.utils.formatEther(unitPrice) + " ETH");
     }
 
@@ -143,17 +144,17 @@ export async function executeMint(contractAddr, signer, qty, log, options = {}) 
       try {
         log("Trying: " + fn.name + "()");
         const args  = buildArgs(fn, qty, addr);
-        let   value = unitPrice * BigInt(qty);
+        let   value = unitPrice.mul(qty);
 
         // Simulate first
         try {
-          await contract[fn.name].staticCall(...args, { value });
+          await contract.callStatic[fn.name](...args, { value });
           log("Simulation passed ✓");
         } catch(simErr) {
           // Retry as free mint (no value)
           try {
-            await contract[fn.name].staticCall(...args);
-            value = 0n;
+            await contract.callStatic[fn.name](...args);
+            value = ethers.constants.Zero;
             log("Simulation passed (free mint) ✓");
           } catch(e) {
             log("Simulation failed — skipping " + fn.name);
