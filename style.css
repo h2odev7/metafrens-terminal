@@ -91,7 +91,10 @@ body{
   white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;
 }
 .wb:hover{border-color:var(--acc);color:var(--acc);}
+.wb:disabled{cursor:default;opacity:1;}
 .wb.connected{border-color:rgba(16,185,129,.4);color:var(--ok);}
+.wb-disconnect{padding-inline:12px;color:var(--err);border-color:rgba(220,38,38,.25);}
+.wb-disconnect:hover{color:var(--err);border-color:rgba(220,38,38,.55);}
 
 /* ── THEME TOGGLE ── */
 .theme-toggle{
@@ -131,13 +134,15 @@ body{
 .url-in:focus{border-color:var(--acc);}
 .url-in::placeholder{color:var(--t2);}
 .url-btn{
-  padding:12px 22px;background:var(--acc);color:#fff;border:none;
+  min-width:70px;
+  padding:12px 18px;background:var(--acc);color:#fff;border:none;
   border-radius:var(--r);font-family:var(--fi);font-size:14px;font-weight:700;
   cursor:pointer;
 }
 .url-btn:hover{background:var(--acc2);}
 .url-hint{font-size:11px;color:var(--t2);margin-bottom:18px;}
 .url-hint span{color:var(--t1);}
+.url-hint .primary{color:var(--acc);font-weight:700;}
 .status-msg{font-size:11px;color:var(--t2);min-height:16px;margin-bottom:10px;}
 .status-msg.ok{color:var(--ok);}
 .status-msg.err{color:var(--err);}
