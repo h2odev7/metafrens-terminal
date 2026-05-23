@@ -158,113 +158,113 @@ $('urlIn').addEventListener('keydown', e => { if (e.key === 'Enter') fetchCollec
 
 async function fetchCollection() {
   const raw = $('urlIn').value.trim();
-  if (!raw) { setStatus('Paste a mint link or 0x contract.', 'err'); return; }
+  if (!raw) { setStatus('Paste a mint link or contract.', 'err'); return; }
 
   const parsed = parseUrl(raw);
-  if (!parsed) { setStatus('Unrecognised link — try pasting the 0x contract directly.', 'err'); return; }
+  if (!parsed) { setStatus('Invalid link — try pasting the 0x address directly.', 'err'); return; }
 
-  setStatus('Fetching collection…');
+  setStatus('Resolving collection…');
+  log('Resolving: ' + parsed.value);
   $('colCard').classList.remove('show');
 
-  try {
-    let contract = null, name = 'Collection';
-    let image = '', banner = '', twitterUrl = '', osUrl = '';
-    let supply = 0, minted = 0, floor = 0;
+  let contract = null, name = 'Collection';
+  let image = '', banner = '', twitterUrl = '', osUrl = '';
+  let supply = 0, minted = 0, floor = 0;
 
+  try {
+    /* ── 1. DIRECT CONTRACT ── */
     if (parsed.type === 'contract') {
       contract = parsed.value;
+    }
 
-      // Read name() from chain
+    /* ── 2. RESERVOIR (primary — free, no key needed) ── */
+    if (!contract && parsed.type === 'slug') {
       try {
-        const r = await fetch('https://ethereum.publicnode.com', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_call', params: [{ to: contract, data: '0x06fdde03' }, 'latest'], id: 1 })
-        });
+        const r = await fetch(`https://api.reservoir.tools/collections/v7?slug=${encodeURIComponent(parsed.value)}`);
         const d = await r.json();
-        if (d.result && d.result.length > 66) {
-          const hex = d.result.slice(130);
-          const decoded = hex.match(/../g)?.map(b => String.fromCharCode(parseInt(b, 16))).join('').replace(/\x00/g, '').trim();
-          if (decoded && decoded.length > 1) name = decoded;
+        const col = d.collections?.[0];
+        if (col) {
+          contract = col.primaryContract || col.contract;
+          name     = col.name    || name;
+          image    = col.image   || '';
+          banner   = col.banner  || col.image || '';
+          floor    = col.floorAsk?.price?.amount?.decimal || 0;
+          supply   = parseInt(col.tokenCount) || 0;
+          minted   = parseInt(col.onSaleCount || col.tokenCount) || 0;
+          twitterUrl = col.twitterUsername ? 'https://x.com/' + col.twitterUsername : '';
+          osUrl    = `https://opensea.io/collection/${parsed.value}`;
+          log('Resolved via Reservoir', 'ok');
         }
-      } catch(e) {}
+      } catch(e) { log('Reservoir failed: ' + e.message, 'warn'); }
+    }
 
-      // Read totalSupply, maxSupply, mintPrice
-      try {
-        const results = await Promise.all([
-          '0x18160ddd', '0xd5abeb01', '0xa0712d68'
-        ].map(async data => {
-          const r = await fetch('https://ethereum.publicnode.com', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_call', params: [{ to: contract, data }, 'latest'], id: 1 })
-          });
-          return (await r.json()).result;
-        }));
-        if (results[0] && results[0] !== '0x') minted = parseInt(results[0], 16);
-        if (results[1] && results[1] !== '0x') supply = parseInt(results[1], 16);
-        if (results[2] && results[2] !== '0x') floor  = parseInt(results[2], 16) / 1e18;
-      } catch(e) {}
-
-    } else {
-      // Slug → OpenSea API
+    /* ── 3. OPENSEA FALLBACK (with CORS proxy) ── */
+    if (!contract && parsed.type === 'slug') {
       for (const px of ['https://corsproxy.io/?url=', 'https://api.allorigins.win/raw?url=']) {
         try {
-          const r = await fetch(px + encodeURIComponent('https://api.opensea.io/api/v2/collections/' + parsed.value), {
-            headers: { Accept: 'application/json' }
-          });
+          const url = `https://api.opensea.io/api/v2/collections/${encodeURIComponent(parsed.value)}`;
+          const r = await fetch(px + encodeURIComponent(url), { headers: { Accept: 'application/json' } });
           const d = await r.json();
-          if (d && !d.errors && d.name) {
-            name       = d.name;
+          if (d && d.contracts?.length) {
+            contract   = d.contracts[0].address;
+            name       = d.name || name;
             image      = d.image_url || '';
-            banner     = d.banner_image_url || d.image_url || '';
+            banner     = d.banner_image_url || image;
             twitterUrl = d.twitter_username ? 'https://x.com/' + d.twitter_username : '';
             osUrl      = 'https://opensea.io/collection/' + d.collection;
-            contract   = d.contracts?.[0]?.address || null;
             supply     = d.total_supply ? parseInt(d.total_supply) : 0;
+            // Get stats for floor + minted count
             try {
-              const sr = await fetch(px + encodeURIComponent('https://api.opensea.io/api/v2/collections/' + d.collection + '/stats'), { headers: { Accept: 'application/json' } });
+              const sr = await fetch(px + encodeURIComponent(`https://api.opensea.io/api/v2/collections/${d.collection}/stats`), { headers: { Accept: 'application/json' } });
               const sd = await sr.json();
-              if (sd.total) {
-                // floor_price = current floor in ETH
-                floor  = sd.total.floor_price || 0;
-                // count = total NFTs minted so far (most accurate)
-                minted = sd.total.count        || 0;
-              }
-              // total_supply from collection data = max supply
-              // Fallback: if no total_supply, use num_owners as minted proxy
-              if (!supply && d.stats) supply = d.stats.total_supply || 0;
+              if (sd.total) { floor = sd.total.floor_price || 0; minted = sd.total.count || 0; }
             } catch(e) {}
+            log('Resolved via OpenSea', 'ok');
             break;
           }
         } catch(e) {}
       }
     }
 
+    /* ── 4. FAIL SAFE ── */
     if (!contract?.match(/^0x[a-fA-F0-9]{40}$/)) {
       setStatus('Could not resolve contract — paste the 0x address directly.', 'err');
       return;
     }
 
+    /* ── 5. ON-CHAIN READS — name, totalSupply ── */
+    try {
+      const provider = window.ethereum
+        ? new ethers.providers.Web3Provider(window.ethereum)
+        : new ethers.providers.JsonRpcProvider('https://ethereum.publicnode.com');
+      const abi = [
+        'function name() view returns (string)',
+        'function totalSupply() view returns (uint256)',
+        'function maxSupply() view returns (uint256)',
+      ];
+      const con = new ethers.Contract(contract, abi, provider);
+      try { const n = await con.name(); if (n && n.length > 0) name = n; } catch(e) {}
+      try { minted = (await con.totalSupply()).toNumber(); } catch(e) {}
+      try { const ms = (await con.maxSupply()).toNumber(); if (ms > 0) supply = ms; } catch(e) {}
+    } catch(e) {}
+
+    /* ── SAVE + RENDER ── */
     COL.contract = contract; COL.name = name;
-    COL.price    = floor;   COL.supply = supply; COL.minted = minted;
+    COL.price    = floor;    COL.supply = supply; COL.minted = minted;
     COL.slug     = parsed.value; COL.platform = parsed.platform;
 
     renderColCard({ name, image, banner, contract, supply, minted, floor, twitterUrl, osUrl });
     setStatus('');
-
-    // Auto-fill price
     if (floor > 0 && $('mPrc')) $('mPrc').value = floor.toFixed(4);
-
-    // Supply note
     if (supply > 0) {
       $('limitNote').classList.add('show');
       $('limitText').textContent = supply.toLocaleString() + ' total supply · ' + (supply - minted).toLocaleString() + ' remaining';
     }
-
     log('Loaded: ' + name + ' (' + contract.slice(0, 10) + '…) via ' + parsed.platform, 'ok');
 
   } catch(e) {
     setStatus('Error: ' + e.message, 'err');
-    log('Fetch error: ' + e.message, 'err');
+    log(e.message, 'err');
   }
 }
 
