@@ -280,7 +280,26 @@ async function fetchCollection() {
 
     renderColCard({ name, image, banner, contract, supply, minted, floor, twitterUrl, osUrl });
     setStatus('');
-    if (floor > 0 && $('mPrc')) $('mPrc').value = floor.toFixed(4);
+    // Auto-detect price from contract (on-chain, most accurate)
+    let detectedPrice = null;
+    try {
+      const provider = window.ethereum
+        ? new ethers.providers.Web3Provider(window.ethereum)
+        : new ethers.providers.JsonRpcProvider('https://ethereum.publicnode.com');
+      detectedPrice = await detectPrice(contract, provider);
+    } catch(e) {}
+
+    if (detectedPrice) {
+      COL.price = parseFloat(detectedPrice);
+      if ($('mPrc')) $('mPrc').value = parseFloat(detectedPrice).toFixed(4);
+      log('Price detected: ' + detectedPrice + ' ETH', 'ok');
+    } else if (floor > 0) {
+      COL.price = floor;
+      if ($('mPrc')) $('mPrc').value = floor.toFixed(4);
+      log('Price from API: ' + floor.toFixed(4) + ' ETH', 'info');
+    } else {
+      log('Price not auto-detected', 'warn');
+    }
     if (supply > 0) {
       $('limitNote').classList.add('show');
       $('limitText').textContent = supply.toLocaleString() + ' total supply · ' + (supply - minted).toLocaleString() + ' remaining';
