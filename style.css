@@ -95,6 +95,8 @@ body{
 .wb.connected{border-color:rgba(16,185,129,.4);color:var(--ok);}
 .wb-disconnect{padding-inline:12px;color:var(--err);border-color:rgba(220,38,38,.25);}
 .wb-disconnect:hover{color:var(--err);border-color:rgba(220,38,38,.55);}
+.wb-pk{padding-inline:10px;font-size:13px;}
+.wb-pk:hover{border-color:rgba(220,38,38,.4);color:#ef4444;}
 
 /* ── THEME TOGGLE ── */
 .theme-toggle{
