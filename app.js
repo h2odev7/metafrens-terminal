@@ -156,6 +156,21 @@ function parseUrl(raw) {
 $('fetchBtn').addEventListener('click', fetchCollection);
 $('urlIn').addEventListener('keydown', e => { if (e.key === 'Enter') fetchCollection(); });
 
+async function fetchWithFallback(url) {
+  const proxies = [
+    '',
+    'https://corsproxy.io/?url=',
+    'https://api.allorigins.win/raw?url='
+  ];
+  for (let p of proxies) {
+    try {
+      const r = await fetch(p ? p + encodeURIComponent(url) : url);
+      if (r.ok) return await r.json();
+    } catch(e) {}
+  }
+  throw new Error('All fetch attempts failed for: ' + url);
+}
+
 async function fetchCollection() {
   const raw = $('urlIn').value.trim();
   if (!raw) { setStatus('Paste a mint link or contract.', 'err'); return; }
@@ -198,32 +213,29 @@ async function fetchCollection() {
       } catch(e) { log('Reservoir failed: ' + e.message, 'warn'); }
     }
 
-    /* ── 3. OPENSEA FALLBACK (with CORS proxy) ── */
+    /* ── 3. OPENSEA FALLBACK ── */
     if (!contract && parsed.type === 'slug') {
-      for (const px of ['https://corsproxy.io/?url=', 'https://api.allorigins.win/raw?url=']) {
-        try {
-          const url = `https://api.opensea.io/api/v2/collections/${encodeURIComponent(parsed.value)}`;
-          const r = await fetch(px + encodeURIComponent(url), { headers: { Accept: 'application/json' } });
-          const d = await r.json();
-          if (d && d.contracts?.length) {
-            contract   = d.contracts[0].address;
-            name       = d.name || name;
-            image      = d.image_url || '';
-            banner     = d.banner_image_url || image;
-            twitterUrl = d.twitter_username ? 'https://x.com/' + d.twitter_username : '';
-            osUrl      = 'https://opensea.io/collection/' + d.collection;
-            supply     = d.total_supply ? parseInt(d.total_supply) : 0;
-            // Get stats for floor + minted count
-            try {
-              const sr = await fetch(px + encodeURIComponent(`https://api.opensea.io/api/v2/collections/${d.collection}/stats`), { headers: { Accept: 'application/json' } });
-              const sd = await sr.json();
-              if (sd.total) { floor = sd.total.floor_price || 0; minted = sd.total.count || 0; }
-            } catch(e) {}
-            log('Resolved via OpenSea', 'ok');
-            break;
-          }
-        } catch(e) {}
-      }
+      try {
+        const d = await fetchWithFallback(
+          'https://api.opensea.io/api/v2/collections/' + parsed.value
+        );
+        if (d && d.contracts?.length) {
+          contract   = d.contracts[0].address;
+          name       = d.name || name;
+          image      = d.image_url || '';
+          banner     = d.banner_image_url || image;
+          twitterUrl = d.twitter_username ? 'https://x.com/' + d.twitter_username : '';
+          osUrl      = 'https://opensea.io/collection/' + d.collection;
+          supply     = d.total_supply ? parseInt(d.total_supply) : 0;
+          try {
+            const sd = await fetchWithFallback(
+              'https://api.opensea.io/api/v2/collections/' + d.collection + '/stats'
+            );
+            if (sd.total) { floor = sd.total.floor_price || 0; minted = sd.total.count || 0; }
+          } catch(e) {}
+          log('Resolved via OpenSea', 'ok');
+        }
+      } catch(e) { log('OpenSea failed: ' + e.message, 'warn'); }
     }
 
     /* ── 4. FAIL SAFE ── */
@@ -248,9 +260,22 @@ async function fetchCollection() {
       try { const ms = (await con.maxSupply()).toNumber(); if (ms > 0) supply = ms; } catch(e) {}
     } catch(e) {}
 
+    /* ── PRIORITIZE ON-CHAIN DATA ── */
+    if (minted > 0) {
+      COL.minted = minted;
+    } else {
+      COL.minted = supply; // fallback
+    }
+    // Supply logic — only set if valid, else leave as unknown
+    if (supply > 0 && supply >= COL.minted) {
+      COL.supply = supply;
+    } else {
+      COL.supply = 0; // unknown instead of wrong
+    }
+
     /* ── SAVE + RENDER ── */
     COL.contract = contract; COL.name = name;
-    COL.price    = floor;    COL.supply = supply; COL.minted = minted;
+    COL.price    = floor;
     COL.slug     = parsed.value; COL.platform = parsed.platform;
 
     renderColCard({ name, image, banner, contract, supply, minted, floor, twitterUrl, osUrl });
