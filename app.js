@@ -125,6 +125,8 @@ window.connectWallet = async function() {
 ══════════════════════════════════════ */
 function parseUrl(raw) {
   raw = raw.trim();
+  // Strip trailing OpenSea page suffixes: /overview /items /activity /offers etc.
+  raw = raw.replace(/\/(overview|items|activity|offers|analytics|traits|holders|mint)(\?.*)?$/, '');
   if (raw.match(/^0x[a-fA-F0-9]{40}$/)) return { type: 'contract', value: raw, platform: 'direct' };
 
   const maps = [
@@ -221,7 +223,15 @@ async function fetchCollection() {
             try {
               const sr = await fetch(px + encodeURIComponent('https://api.opensea.io/api/v2/collections/' + d.collection + '/stats'), { headers: { Accept: 'application/json' } });
               const sd = await sr.json();
-              floor = sd.total?.floor_price || 0;
+              if (sd.total) {
+                // floor_price = current floor in ETH
+                floor  = sd.total.floor_price || 0;
+                // count = total NFTs minted so far (most accurate)
+                minted = sd.total.count        || 0;
+              }
+              // total_supply from collection data = max supply
+              // Fallback: if no total_supply, use num_owners as minted proxy
+              if (!supply && d.stats) supply = d.stats.total_supply || 0;
             } catch(e) {}
             break;
           }
