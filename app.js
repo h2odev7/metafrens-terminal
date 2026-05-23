@@ -550,14 +550,16 @@ $('overlay').onclick    = e => { if (e.target.id === 'overlay') $('overlay').cla
    THEME TOGGLE
 ══════════════════════════════════════ */
 window.toggleTheme = function() {
-  const isDark = document.body.classList.toggle('dark');
+  const isDark = document.documentElement.classList.toggle('dark');
+  document.body.classList.toggle('dark', isDark);
   $('themeIcon').textContent = isDark ? '☽' : '○';
   localStorage.setItem('mb_theme', isDark ? 'dark' : 'light');
 };
 
-// Restore saved theme
+// Restore saved theme on load
 (function() {
   if (localStorage.getItem('mb_theme') === 'dark') {
+    document.documentElement.classList.add('dark');
     document.body.classList.add('dark');
     const ic = document.getElementById('themeIcon');
     if (ic) ic.textContent = '☽';
