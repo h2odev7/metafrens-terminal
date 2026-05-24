@@ -58,6 +58,7 @@
       ⚠️ Use a dedicated hot wallet only. Never use your main wallet's key.
     </div>
   </div>
+  <div id="walletList" style="margin-top:8px;font-size:11px;color:var(--t1);max-width:600px;margin:8px auto 0;"></div>
 </div>
 
 <!-- PAGE -->
@@ -158,6 +159,16 @@
             <button class="mode-tab" data-mode="sniper">SNIPER</button>
           </div>
           <div class="mode-note" id="modeNote">Opens wallet immediately — you sign to mint</div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div class="mc-mode-lbl">Gas Mode</div>
+          <select id="gasModeSelect" onchange="applyGasMode(this.value)"
+            style="width:100%;background:var(--card2);border:1px solid var(--b1);color:var(--t0);
+                   padding:8px 10px;border-radius:6px;font-family:var(--fi);font-size:12px;outline:none;">
+            <option value="normal">Normal — 1.1× base fee</option>
+            <option value="aggressive">Aggressive — 1.3× base fee</option>
+            <option value="war">🔥 War Mode — 1.6× base fee + 5 gwei tip</option>
+          </select>
         </div>
         <div class="sched-row" id="schedRow" style="display:none;">
           <label>Mint Time (Local)</label>
