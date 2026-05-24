@@ -394,6 +394,55 @@ body{
 .btn-dl:hover{color:var(--t0);border-color:var(--acc);}
 .mfoot{font-size:9px;color:var(--t2);line-height:1.6;border-top:1px solid var(--b0);padding-top:10px;margin-top:4px;}
 
+
+/* ── GAS MODE SELECT ── */
+#gasModeSelect{
+  width:100%;background:var(--card2);border:1px solid var(--b1);color:var(--t0);
+  padding:8px 10px;font-family:var(--fi);font-size:12px;
+  border-radius:var(--r-sm);outline:none;cursor:pointer;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239090b0' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;
+}
+#gasModeSelect:focus{border-color:var(--acc);}
+#gasModeSelect option{background:var(--card);color:var(--t0);}
+
+/* War mode — red glow on mint button when active */
+.gas-war .mint-btn{
+  border-color:var(--err) !important;
+  color:var(--err) !important;
+  background:rgba(220,38,38,.08) !important;
+}
+.gas-war .mint-btn:hover{
+  background:rgba(220,38,38,.16) !important;
+  box-shadow:0 6px 20px rgba(220,38,38,.25) !important;
+}
+
+/* ── WALLET LIST ── */
+#walletList{margin-top:8px;font-size:11px;color:var(--t1);}
+#walletList > div{
+  display:flex;align-items:center;gap:8px;
+  padding:5px 0;border-bottom:1px solid var(--b0);
+}
+#walletList > div:last-child{border-bottom:none;}
+#walletList input[type=number]{
+  width:50px;background:var(--card2);border:1px solid var(--b1);color:var(--t0);
+  padding:3px 6px;border-radius:4px;font-size:11px;
+  text-align:center;outline:none;font-family:var(--fi);
+  -moz-appearance:textfield;
+}
+#walletList input[type=number]::-webkit-inner-spin-button,
+#walletList input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
+#walletList input[type=number]:focus{border-color:var(--acc);}
+#walletList label{font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;}
+
+/* ── PK SECTION ── */
+#pkInput{
+  background:var(--card2);border:1px solid rgba(220,38,38,.3);color:var(--t0);
+  font-family:monospace;border-radius:6px;outline:none;
+}
+#pkInput:focus{border-color:rgba(220,38,38,.6);}
+
 /* ── MOBILE ── */
 @media(max-width:860px){
   .page{padding:16px 14px 40px;}
