@@ -6,15 +6,26 @@
 
 'use strict';
 
-import { executeMint, detectPrice, createPrivateKeySigner, getPrivateKeyAddress } from './mintEngine.js';
+const OPENSEA_API_KEY = '5ba47a8af05f4082a613832c2dc30bcc';
+const OPENSEA_HEADERS = { 'Accept': 'application/json', 'x-api-key': OPENSEA_API_KEY };
+
+import { executeMint, executeMintWithRetry, executeMultiWalletMint, executeWithGasRetry, startSniper, checkSaleStatus, detectPrice, getDynamicGas, createPrivateKeySigner, getPrivateKeyAddress } from './mintEngine.js';
 
 const $ = id => document.getElementById(id);
 
+const RPC_URL = 'https://ethereum.publicnode.com';
+
 const S = {
-  provider: null, signer: null, addr: null,
+  provider:  null,
+  wallets:   [],   // [{ signer, address, qty }]
+  gasMode:   'normal',  // normal | aggressive | war
   ethPrice: 0, gasPrice: 0,
   tasks: [], mode: 'manual', pending: null,
-  pkMode: false  // true when using private key instead of MetaMask
+  // convenience getters
+  get signer()    { return this.wallets[0]?.signer  || null; },
+  get addr()      { return this.wallets[0]?.address || null; },
+  get signers()   { return this.wallets.map(w => w.signer); },
+  get addresses() { return this.wallets.map(w => w.address); },
 };
 
 const COL = {
@@ -117,11 +128,14 @@ window.connectWallet = async function({ forcePicker = false } = {}) {
 
     S.provider = new ethers.providers.Web3Provider(window.ethereum);
     await S.provider.send('eth_requestAccounts', []);
-    S.signer = S.provider.getSigner();
-    S.addr = await S.signer.getAddress();
-    setWalletConnected(S.addr);
-    if ($('mAddr')) $('mAddr').value = S.addr;
-    log('Connected: ' + S.addr, 'ok');
+    const _mmSigner = S.provider.getSigner();
+    const _mmAddr   = await _mmSigner.getAddress();
+    // MetaMask = wallet #1
+    S.wallets = [{ signer: _mmSigner, address: _mmAddr, qty: 1 }];
+    setWalletConnected(_mmAddr);
+    if ($('mAddr')) $('mAddr').value = _mmAddr;
+    renderWallets();
+    log('Connected: ' + _mmAddr, 'ok');
     setStatus('Wallet connected.', 'ok');
   } catch(e) {
     log('Wallet error: ' + (e.message || e), 'err');
@@ -149,8 +163,7 @@ window.disconnectWallet = async function() {
   } catch(e) {}
 
   S.provider = null;
-  S.signer = null;
-  S.addr = null;
+  S.wallets  = [];
   const btn = $('walletBtn');
   if (btn) {
     btn.textContent = 'Connect Wallet';
@@ -168,12 +181,19 @@ window.disconnectWallet = async function() {
 if (window.ethereum) {
   window.ethereum.on?.('accountsChanged', accounts => {
     if (accounts?.length) {
-      S.addr = accounts[0];
       S.provider = new ethers.providers.Web3Provider(window.ethereum);
-      S.signer = S.provider.getSigner();
-      setWalletConnected(S.addr);
-      if ($('mAddr')) $('mAddr').value = S.addr;
-      log('Wallet switched: ' + S.addr, 'info');
+      const _sw  = S.provider.getSigner();
+      const _sa  = accounts[0];
+      // Replace slot 0 (MetaMask), keep PK wallets
+      if (S.wallets.length > 0) {
+        S.wallets[0] = { signer: _sw, address: _sa, qty: S.wallets[0]?.qty || 1 };
+      } else {
+        S.wallets = [{ signer: _sw, address: _sa, qty: 1 }];
+      }
+      setWalletConnected(_sa);
+      if ($('mAddr')) $('mAddr').value = _sa;
+      renderWallets();
+      log('Wallet switched: ' + _sa, 'info');
     } else {
       window.disconnectWallet();
     }
@@ -181,18 +201,18 @@ if (window.ethereum) {
 }
 
 async function ensureSignerMatches(addr) {
-  if (!S.signer) {
+  if (!S.wallets.length) {
     await window.connectWallet();
   }
-  if (!S.signer) return false;
+  if (!S.wallets.length) return false;
 
-  const signerAddr = (await S.signer.getAddress()).toLowerCase();
+  const signerAddr = S.wallets[0].address.toLowerCase();
   if (addr && addr.toLowerCase() !== signerAddr) {
     setStatus('MetaMask is connected to a different account. Click the connected wallet button to switch accounts.', 'err');
     log('Wallet mismatch: field has ' + addr + ', MetaMask has ' + signerAddr, 'warn');
     return false;
   }
-  if ($('mAddr')) $('mAddr').value = await S.signer.getAddress();
+  if ($('mAddr')) $('mAddr').value = S.wallets[0].address;
   return true;
 }
 
@@ -235,7 +255,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 6500) {
   }
 }
 
-async function fetchWithFallback(url, { parse = 'json', timeoutMs = 6500, direct = true } = {}) {
+async function fetchWithFallback(url, { parse = 'json', timeoutMs = 6500, direct = true, headers = {} } = {}) {
   const proxies = [
     ...(direct ? [''] : []),
     'https://corsproxy.io/?url=',
@@ -244,7 +264,7 @@ async function fetchWithFallback(url, { parse = 'json', timeoutMs = 6500, direct
   let lastError = null;
   for (const p of proxies) {
     try {
-      const r = await fetchWithTimeout(p ? p + encodeURIComponent(url) : url, {}, timeoutMs);
+      const r = await fetchWithTimeout(p ? p + encodeURIComponent(url) : url, { headers }, timeoutMs);
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return parse === 'text' ? await r.text() : await r.json();
     } catch(e) {
@@ -297,13 +317,13 @@ async function resolveOpenSeaSlug(slug) {
   // 2. OpenSea API with CORS proxies
   try {
     setStatus('Trying OpenSea API...');
-    const d = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + slug, { timeoutMs: 6000 });
+    const d = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + slug, { timeoutMs: 6000, headers: OPENSEA_HEADERS });
     if (d?.contracts?.length || d?.name) {
       const collectionId = d.collection || slug;
       let floor = 0, minted = 0;
       // Fetch stats for real supply numbers
       try {
-        const sd = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + collectionId + '/stats', { timeoutMs: 5000 });
+        const sd = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + collectionId + '/stats', { timeoutMs: 5000, headers: OPENSEA_HEADERS });
         if (sd?.total) { floor = sd.total.floor_price || 0; minted = sd.total.count || 0; }
       } catch(e) {}
       const rawName = (d.name || 'Collection').replace(/\s+\d+\.?\d*\s*(ETH|eth|Ξ)/g, '').trim();
@@ -486,6 +506,21 @@ async function fetchCollection() {
       $('limitText').textContent = COL.supply.toLocaleString() + ' total supply · ' + remaining.toLocaleString() + ' remaining';
     }
     log('Loaded: ' + name + ' (' + contract.slice(0, 10) + '...) via ' + COL.platform, 'ok');
+
+    // Check sale status on-chain
+    try {
+      const _p = window.ethereum
+        ? new ethers.providers.Web3Provider(window.ethereum)
+        : new ethers.providers.JsonRpcProvider('https://ethereum.publicnode.com');
+      const saleStatus = await checkSaleStatus(contract, _p);
+      if (saleStatus.paused) {
+        log('⚠️ Contract is PAUSED', 'warn');
+      } else if (saleStatus.active === true) {
+        log('Sale: ACTIVE (' + saleStatus.reason + ')', 'ok');
+      } else if (saleStatus.active === false) {
+        log('Sale: INACTIVE (' + saleStatus.reason + ')', 'warn');
+      }
+    } catch(e) {}
   } catch(e) {
     setStatus('Error: ' + e.message, 'err');
     log(e.message, 'err');
@@ -689,6 +724,7 @@ function buildTask(addr) {
     options: getOptions(),
     mode: S.mode,
     time: S.mode === 'scheduled' ? new Date($('mTime').value) : null,
+    wallets: S.wallets.map(w => ({ ...w })),  // snapshot with per-wallet qty
     status: 'ready'
   };
 }
@@ -707,7 +743,30 @@ $('mintBtn').addEventListener('click', async () => {
     if (await ensureSignerMatches(addr)) {
       setStatus('Opening MetaMask for signature...');
       try {
-        const result = await executeMint(task.contract, S.signer, task.qty, msg => log(msg, 'info'), task.options);
+        const _mWallets = (task.wallets?.length ? task.wallets : S.wallets);
+        const results = await Promise.allSettled(
+          _mWallets.map(async (w) => {
+            const { signer, address, qty: wQty } = w;
+            try {
+              log(`Minting ${wQty} with ${address.slice(0,6)}…`, 'info');
+              const res = await executeMint(
+                task.contract, signer, wQty,
+                msg => log(`[${address.slice(0,6)}] ${msg}`, 'info'),
+                { ...task.options, gasMode: S.gasMode }
+              );
+              return { success: true, address, res };
+            } catch(e) {
+              return { success: false, address, error: e.message };
+            }
+          })
+        );
+        results.forEach(r => {
+          if (r.status === 'fulfilled') {
+            if (r.value.success) log(`✅ ${r.value.address.slice(0,6)}… minted`, 'ok');
+            else log(`❌ ${r.value.address.slice(0,6)}…: ${r.value.error}`, 'err');
+          } else { log('❌ Wallet error: ' + r.reason, 'err'); }
+        });
+        const result = { success: results.some(r => r.status === 'fulfilled' && r.value?.success) };
         if (result.success) {
           const link = '<a href="https://etherscan.io/tx/' + result.hash + '" target="_blank" rel="noopener">' + result.hash.slice(0,14) + '…</a>';
           setStatus('Mint confirmed ✅', 'ok');
@@ -793,8 +852,8 @@ function renderTasks() {
     if (!t) return;
     if (b.dataset.a === 'fire') {
       t.status = 'ready';
-      if (S.signer) {
-        try { await executeMint(t.contract, S.signer, t.qty, msg => log(msg, 'info'), t.options); }
+      if (S.wallets.length) {
+        try { await executeMultiWalletMint(t.contract, S.signers, t.qty, msg => log(msg, 'info'), t.options); }
         catch(e) { log(e.message, 'err'); }
       } else {
         openModal(t);
@@ -812,34 +871,32 @@ function tickTasks() {
     if (t.mode === 'scheduled' && t.time && t.status === 'waiting' && new Date() >= t.time) {
       t.status = 'ready';
       log('SCHEDULED: ' + t.name, 'ok');
-      if (S.signer) {
-        try { await executeMint(t.contract, S.signer, t.qty, msg => log(msg, 'info'), t.options); }
+      if (S.wallets.length) {
+        try { await executeMultiWalletMint(t.contract, S.signers, t.qty, msg => log(msg, 'info'), t.options); }
         catch(e) { log(e.message, 'err'); }
       } else { openModal(t); }
     }
 
-    if (t.mode === 'sniper' && t.status === 'watching') {
-      const now = Math.floor(Date.now() / 1000);
-      if (!t._p || now - t._p >= 10) {
-        t._p = now;
-        try {
-          const r = await fetch('https://ethereum.publicnode.com', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_call', params: [{ to: t.contract, data: '0x1249c58b' }, 'latest'], id: 1 })
-          });
-          const d = await r.json();
-          if (d.result !== undefined && !d.error) {
-            t.status = 'ready';
-            log('SNIPER HIT: ' + t.name + ' is LIVE', 'ok');
-            if (S.signer) {
-              try { await executeMint(t.contract, S.signer, t.qty, msg => log(msg, 'info'), t.options); }
-              catch(e) { log(e.message, 'err'); }
-            } else { openModal(t); }
-          }
-        } catch(e) {}
-        renderTasks();
-      }
+    if (t.mode === 'sniper' && t.status === 'watching' && !t._sniperStop) {
+      if (!S.wallets.length) { t.status = 'waiting'; return; }
+      t._sniperStop = startSniper(
+        t.contract, S.wallets[0].signer, t.qty,
+        (msg, type) => log(msg, type || 'info'),
+        t.options,
+        async () => {
+          t.status = 'ready';
+          renderTasks();
+          try {
+            const wallets = [S.signer, ...(S.wallets || [])];
+            if (wallets.length > 1) {
+              await executeMultiWalletMint(t.contract, wallets, t.qty, msg => log(msg, 'info'), t.options);
+            } else {
+              await executeMintWithRetry(t.contract, S.signer, t.qty, msg => log(msg, 'info'), t.options, 3);
+            }
+            setStatus('✅ Sniper mint confirmed!', 'ok');
+          } catch(e) { log(e.message, 'err'); if (!S.wallets.length) openModal(t); }
+        }
+      );
     }
   });
   renderTasks();
@@ -857,10 +914,10 @@ function openModal(task) {
     ['Gas', task.options.maxGas + ' gwei max - ' + task.options.tip + ' gwei tip'],
   ].map(([k, v]) => '<div class="txr"><span class="txk">' + k + '</span><span class="txv">' + v + '</span></div>').join('');
 
-  $('modalDesc').textContent = S.signer
+  $('modalDesc').textContent = S.wallets.length > 0
     ? 'MetaMask connected - sign on-chain directly.'
     : 'Connect MetaMask or use a wallet deep-link below.';
-  $('btnMM').style.display = S.signer ? 'block' : 'none';
+  $('btnMM').style.display = S.wallets.length > 0 ? 'block' : 'none';
   $('btnRainbow').href = 'https://rnbwapp.com/wc?uri=' + encodeURIComponent('ethereum:' + task.contract + '@1?value=' + vW);
   $('btnTrust').href = 'trust://send?address=' + task.contract + '&amount=' + tot + '&coin=60';
   $('overlay').classList.add('open');
@@ -873,7 +930,10 @@ window.signWithMM = async function() {
   $('overlay').classList.remove('open');
   setStatus('Minting...');
   try {
-    const result = await executeMint(t.contract, S.signer, t.qty, msg => log(msg, 'info'), t.options);
+    const taskWallets = t.wallets?.length ? t.wallets : S.wallets;
+    const result = await Promise.allSettled(taskWallets.map(w => executeMint(t.contract, w.signer, w.qty, msg => log(msg,'info'), { ...t.options, gasMode: S.gasMode })));
+    const _r, msg => log(msg, 'info'), t.options);
+    const r = { success: result.some(x => x.status === 'fulfilled' && x.value?.success) };
     setStatus(result.success ? 'Mint successful' : 'Done', 'ok');
     S.tasks = S.tasks.filter(x => x.id !== t.id);
     renderTasks();
@@ -911,28 +971,63 @@ window.connectPrivateKey = async function() {
   if (!pkInput) return;
   const pk = pkInput.value.trim();
   if (!pk) { setStatus('Enter a private key.', 'err'); return; }
-
   try {
-    const wallet = createPrivateKeySigner(pk);
-    S.signer = wallet;
-    S.addr = await wallet.getAddress();
-    S.pkMode = true;
+    const signer = createPrivateKeySigner(pk, RPC_URL);
+    const address = await signer.getAddress();
 
-    setStatus('Private key wallet connected.', 'ok');
-    pkInput.value = ''; // clear immediately for security
-    $('pkInput').placeholder = '✓ Key loaded — cleared for security';
+    if (S.wallets.find(w => w.address.toLowerCase() === address.toLowerCase())) {
+      pkInput.value = '';
+      setStatus('Wallet already added: ' + address.slice(0,10) + '…', 'warn');
+      return;
+    }
 
-    setWalletConnected(S.addr);
-    if ($('mAddr')) $('mAddr').value = S.addr;
-    log('PK wallet: ' + S.addr, 'ok');
+    S.wallets.push({ signer, address, qty: 1 });
 
-    // Hide PK section
-    const pkSection = $('pkSection');
-    if (pkSection) pkSection.style.display = 'none';
-  } catch(e) {
-    setStatus('Invalid private key: ' + e.message, 'err');
-    log(e.message, 'err');
+    pkInput.value = '';
+    pkInput.placeholder = '✓ Key loaded — add another or close';
+
+    if (S.wallets.length === 1) {
+      setWalletConnected(address);
+      if ($('mAddr')) $('mAddr').value = address;
+    }
+
+    renderWallets();
+    setStatus('Added wallet #' + S.wallets.length + ': ' + address.slice(0,10) + '…', 'ok');
+    log('Added PK wallet #' + S.wallets.length + ': ' + address, 'ok');
+  } catch(e) { setStatus('Invalid key: ' + e.message, 'err'); log(e.message, 'err'); }
+};
+
+function renderWallets() {
+  const el = $('walletList');
+  if (!el) return;
+  if (!S.wallets.length) { el.innerHTML = ''; return; }
+  el.innerHTML = S.wallets.map((w, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--b0);">
+      <span style="font-size:11px;">${i === 0 ? '🦊' : '🔑'} ${w.address.slice(0,6)}…${w.address.slice(-4)}</span>
+      <label style="font-size:9px;color:var(--t2);">QTY</label>
+      <input type="number" value="${w.qty}" min="1" max="20"
+        style="width:48px;background:var(--card2);border:1px solid var(--b1);color:var(--t0);
+               padding:3px 6px;border-radius:4px;font-size:11px;text-align:center;"
+        onchange="updateWalletQty(${i}, this.value)"/>
+      <button onclick="removeWallet(${i})"
+        style="background:none;border:none;color:var(--err);cursor:pointer;font-size:11px;margin-left:auto;">✕</button>
+    </div>`
+  ).join('');
+}
+
+function updateWalletQty(i, val) {
+  if (S.wallets[i]) S.wallets[i].qty = Math.max(1, parseInt(val) || 1);
+}
+
+window.removeWallet = function(i) {
+  if (i === 0 && S.provider) {
+    setStatus('Use Disconnect to remove the MetaMask wallet.', 'warn');
+    return;
   }
+  const addr = S.wallets[i]?.address;
+  S.wallets.splice(i, 1);
+  renderWallets();
+  log('Removed wallet: ' + (addr || ''), 'info');
 };
 
 window.togglePKSection = function() {
