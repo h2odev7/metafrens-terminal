@@ -713,6 +713,12 @@ function getOptions() {
   };
 }
 
+function applyGasMode(mode) {
+  S.gasMode = mode;
+  document.body.classList.toggle('gas-war', mode === 'war');
+  document.documentElement.classList.toggle('gas-war', mode === 'war');
+}
+
 function buildTask(addr) {
   return {
     id: Date.now(),
