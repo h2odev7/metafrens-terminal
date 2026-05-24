@@ -4,12 +4,12 @@
  * task queue, sniper, theme toggle
  */
 
+import { executeMint, executeMintWithRetry, executeMultiWalletMint, executeWithGasRetry, startSniper, checkSaleStatus, detectPrice, getDynamicGas, createPrivateKeySigner, getPrivateKeyAddress } from './mintEngine.js';
+
 'use strict';
 
 const OPENSEA_API_KEY = '5ba47a8af05f4082a613832c2dc30bcc';
 const OPENSEA_HEADERS = { 'Accept': 'application/json', 'x-api-key': OPENSEA_API_KEY };
-
-import { executeMint, executeMintWithRetry, executeMultiWalletMint, executeWithGasRetry, startSniper, checkSaleStatus, detectPrice, getDynamicGas, createPrivateKeySigner, getPrivateKeyAddress } from './mintEngine.js';
 
 const $ = id => document.getElementById(id);
 
@@ -179,6 +179,7 @@ window.disconnectWallet = async function() {
 };
 
 if (window.ethereum) {
+  window.ethereum.on?.('chainChanged', () => checkNetworkWarning());
   window.ethereum.on?.('accountsChanged', accounts => {
     if (accounts?.length) {
       S.provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -709,7 +710,8 @@ function getOptions() {
   return {
     maxGas: parseInt($('mGas').value) || 50,
     tip: parseFloat($('mTip').value) || 2,
-    manualPrice: COL.price || null
+    manualPrice: COL.price || null,
+    gasMode: S.gasMode
   };
 }
 
@@ -937,10 +939,21 @@ window.signWithMM = async function() {
   setStatus('Minting...');
   try {
     const taskWallets = t.wallets?.length ? t.wallets : S.wallets;
-    const result = await Promise.allSettled(taskWallets.map(w => executeMint(t.contract, w.signer, w.qty, msg => log(msg,'info'), { ...t.options, gasMode: S.gasMode })));
-    const _r, msg => log(msg, 'info'), t.options);
-    const r = { success: result.some(x => x.status === 'fulfilled' && x.value?.success) };
-    setStatus(result.success ? 'Mint successful' : 'Done', 'ok');
+    const results = await Promise.allSettled(
+      taskWallets.map(w => executeMint(
+        t.contract, w.signer, w.qty,
+        msg => log(`[${w.address.slice(0,6)}] ${msg}`, 'info'),
+        { ...t.options, gasMode: S.gasMode }
+      ))
+    );
+    results.forEach(r => {
+      if (r.status === 'fulfilled') {
+        const v = r.value;
+        if (v?.success) log('✅ ' + (v.hash ? v.hash.slice(0,14) + '…' : 'minted'), 'ok');
+      } else { log('❌ ' + (r.reason?.message || r.reason), 'err'); }
+    });
+    const allDone = { success: results.some(x => x.status === 'fulfilled' && x.value?.success) };
+    setStatus(allDone.success ? '✅ Mint successful!' : 'All wallets failed', allDone.success ? 'ok' : 'err');
     S.tasks = S.tasks.filter(x => x.id !== t.id);
     renderTasks();
   } catch(e) {
@@ -1041,6 +1054,34 @@ window.togglePKSection = function() {
   if (s) s.style.display = s.style.display === 'none' ? 'block' : 'none';
 };
 
+
+window.switchToMainnet = async function() {
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: '0x1' }]
+    });
+    const netWarn = document.getElementById('netWarn');
+    if (netWarn) netWarn.classList.remove('show');
+    S.provider = new ethers.providers.Web3Provider(window.ethereum);
+    if (S.wallets.length > 0 && !S.wallets[0].signer._isSigner) {
+      S.wallets[0].signer = S.provider.getSigner();
+    }
+    log('Switched to Ethereum Mainnet ✓', 'ok');
+  } catch(e) {
+    log('Could not switch network: ' + e.message, 'err');
+  }
+};
+
+async function checkNetworkWarning() {
+  if (!window.ethereum) return;
+  try {
+    const chainId = parseInt(await window.ethereum.request({ method: 'eth_chainId' }), 16);
+    const netWarn = document.getElementById('netWarn');
+    if (netWarn) netWarn.classList.toggle('show', chainId !== 1);
+  } catch(e) {}
+}
+
 async function init() {
   // Restore persisted tasks
   try {
@@ -1058,6 +1099,15 @@ async function init() {
   const t = new Date(Date.now() + 3600e3);
   if ($('mTime')) $('mTime').value = t.toISOString().slice(0, 16);
   await Promise.all([loadPrices(), loadGas()]);
+  if (window.ethereum) await checkNetworkWarning();
 }
+
+
+/* ── Window aliases for HTML onclick handlers ── */
+window.updateWalletQty  = updateWalletQty;
+window.applyGasMode     = applyGasMode;
+window.renderWallets    = renderWallets;
+window.connectWallet    = window.connectWallet    || connectWallet;
+window.disconnectWallet = window.disconnectWallet || disconnectWallet;
 
 init();
