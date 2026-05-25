@@ -69,12 +69,21 @@ export async function detectPrice(contractAddress, provider) {
     "function getPrice() view returns (uint256)",
     "function publicPrice() view returns (uint256)",
     "function salePrice() view returns (uint256)",
-    "function tokenPrice() view returns (uint256)"
+    "function tokenPrice() view returns (uint256)",
+    "function PRICE() view returns (uint256)",
+    "function MINT_PRICE() view returns (uint256)",
+    "function currentPrice() view returns (uint256)",
+    "function getMintPrice() view returns (uint256)",
+    "function pricePerToken() view returns (uint256)",
+    "function mintCost() view returns (uint256)",
+    "function presalePrice() view returns (uint256)"
   ];
   const contract = new ethers.Contract(contractAddress, abi, provider);
   const methods = [
-    "publicSalePrice", "mintPrice", "price",
-    "cost", "getPrice", "publicPrice", "salePrice", "tokenPrice"
+    "publicSalePrice", "mintPrice", "price", "cost",
+    "getPrice", "publicPrice", "salePrice", "tokenPrice",
+    "PRICE", "MINT_PRICE", "currentPrice", "getMintPrice",
+    "pricePerToken", "mintCost", "presalePrice"
   ];
   for (const m of methods) {
     try {
