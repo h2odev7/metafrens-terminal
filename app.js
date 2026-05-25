@@ -6,6 +6,9 @@
 
 'use strict';
 
+const OPENSEA_API_KEY = '5ba47a8af05f4082a613832c2dc30bcc';
+const OPENSEA_HEADERS = { 'Accept': 'application/json', 'x-api-key': OPENSEA_API_KEY };
+
 import { executeMint, detectPrice, createPrivateKeySigner, getPrivateKeyAddress } from './mintEngine.js';
 
 const $ = id => document.getElementById(id);
@@ -235,7 +238,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 6500) {
   }
 }
 
-async function fetchWithFallback(url, { parse = 'json', timeoutMs = 6500, direct = true } = {}) {
+async function fetchWithFallback(url, { headers = {}, parse = 'json', timeoutMs = 6500, direct = true } = {}) {
   const proxies = [
     ...(direct ? [''] : []),
     'https://corsproxy.io/?url=',
@@ -244,7 +247,7 @@ async function fetchWithFallback(url, { parse = 'json', timeoutMs = 6500, direct
   let lastError = null;
   for (const p of proxies) {
     try {
-      const r = await fetchWithTimeout(p ? p + encodeURIComponent(url) : url, {}, timeoutMs);
+      const r = await fetchWithTimeout(p ? p + encodeURIComponent(url) : url, Object.keys(headers).length ? { headers } : {}, timeoutMs);
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return parse === 'text' ? await r.text() : await r.json();
     } catch(e) {
@@ -297,13 +300,13 @@ async function resolveOpenSeaSlug(slug) {
   // 2. OpenSea API with CORS proxies
   try {
     setStatus('Trying OpenSea API...');
-    const d = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + slug, { timeoutMs: 6000 });
+    const d = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + slug, { timeoutMs: 6000, headers: OPENSEA_HEADERS });
     if (d?.contracts?.length || d?.name) {
       const collectionId = d.collection || slug;
       let floor = 0, minted = 0;
       // Fetch stats for real supply numbers
       try {
-        const sd = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + collectionId + '/stats', { timeoutMs: 5000 });
+        const sd = await fetchWithFallback('https://api.opensea.io/api/v2/collections/' + collectionId + '/stats', { headers: OPENSEA_HEADERS, timeoutMs: 5000 });
         if (sd?.total) { floor = sd.total.floor_price || 0; minted = sd.total.count || 0; }
       } catch(e) {}
       const rawName = (d.name || 'Collection').replace(/\s+\d+\.?\d*\s*(ETH|eth|Ξ)/g, '').trim();
