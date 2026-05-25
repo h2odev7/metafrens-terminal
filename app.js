@@ -361,6 +361,7 @@ async function fetchCollection() {
   setStatus('Resolving ETH collection...');
   log('Resolving: ' + parsed.value);
   $('colCard').classList.remove('show');
+  if ($('mPrc')) $('mPrc').value = '';
 
   let contract = null, name = 'Collection';
   let image = '', banner = '', twitterUrl = '', osUrl = '';
@@ -467,6 +468,7 @@ async function fetchCollection() {
     const phasePrice = phases?.[0]?.price ? parseFloat(phases[0].price) : 0;
     if (phasePrice > 0) {
       COL.price = phasePrice;
+      if ($('mPrc') && !$('mPrc').value) $('mPrc').value = phasePrice.toFixed(4);
       log('Price from mint phase: ' + phasePrice.toFixed(4) + ' ETH', 'ok');
     } else if (detectedPrice) {
       COL.price = parseFloat(detectedPrice);
@@ -505,61 +507,70 @@ async function fetchCollection() {
    FETCH MINT PHASES from OpenSea
 ══════════════════════════════════════ */
 async function fetchMintPhases(slug) {
-  // ── OpenSea mint_stages (returns price_per_token in wei) ──
+  // ── 1. OpenSea mint_stages — price_per_token in wei ──
   try {
     const d = await fetchWithFallback(
       'https://api.opensea.io/api/v2/collections/' + slug + '/mint_stages',
       { timeoutMs: 6000, headers: OPENSEA_HEADERS }
     );
     if (d?.mint_stages?.length) {
-      // Normalise price: price_per_token is in wei (string), convert to ETH
-      return d.mint_stages.map(s => ({
-        ...s,
-        price: s.price_per_token
-          ? parseFloat(ethers.utils.formatEther(s.price_per_token))
-          : (s.price != null ? parseFloat(s.price) : 0)
-      }));
+      const stages = d.mint_stages.map(s => {
+        let price = 0;
+        if (s.price_per_token && s.price_per_token !== '0') {
+          try { price = parseFloat(ethers.utils.formatEther(s.price_per_token)); } catch(e2) {}
+        } else if (s.price != null) {
+          price = parseFloat(s.price);
+        }
+        return { ...s, price };
+      });
+      if (stages.length > 0) return stages;
     }
   } catch(e) {}
 
-  // ── OpenSea drops API — has mint_price in USD + ETH ──
+  // ── 2. OpenSea collection drops endpoint ──
   try {
     const d = await fetchWithFallback(
-      'https://api.opensea.io/api/v2/drops?collection_slug=' + encodeURIComponent(slug),
+      'https://api.opensea.io/api/v2/collections/' + slug + '/drops',
       { timeoutMs: 6000, headers: OPENSEA_HEADERS }
     );
-    const drop = d?.results?.[0] || d?.drops?.[0];
+    const drop = d?.drops?.[0] || d?.results?.[0] || (Array.isArray(d) ? d[0] : null);
     if (drop) {
-      const priceUSD = drop.mint_price || drop.price || 0;
-      const priceETH = S.ethPrice > 0 && priceUSD > 0 ? priceUSD / S.ethPrice : 0;
-      return [{
-        stage: drop.stage || 'public-sale',
-        name: drop.name || 'Public Sale',
-        price: priceETH,
-        price_usd: priceUSD,
-        start_time: drop.start_date || drop.mint_start_date || null,
-        end_time: drop.end_date || drop.mint_end_date || null,
-        max_per_wallet: drop.max_per_wallet || null,
-      }];
+      let price = 0;
+      if (drop.price_per_token && drop.price_per_token !== '0') {
+        try { price = parseFloat(ethers.utils.formatEther(drop.price_per_token)); } catch(e2) {}
+      }
+      if (!price && drop.mint_price && S.ethPrice > 0) {
+        price = parseFloat(drop.mint_price) / S.ethPrice;
+      }
+      return [{ stage: 'public-sale', name: 'Public Sale', price,
+        start_time: drop.start_date || null, end_time: drop.end_date || null,
+        max_per_wallet: drop.max_per_wallet || null }];
     }
   } catch(e) {}
 
-  // ── Reservoir saleConfig fallback ──
+  // ── 3. Reservoir with mintStages ──
   try {
     const d = await fetchWithFallback(
-      'https://api.reservoir.tools/collections/v7?slug=' + encodeURIComponent(slug),
+      'https://api.reservoir.tools/collections/v7?slug=' + encodeURIComponent(slug) + '&includeMintStages=true',
       { timeoutMs: 5000 }
     );
     const col = d?.collections?.[0];
+    if (col?.mintStages?.length) {
+      return col.mintStages.map(s => ({
+        stage: s.stage || 'public-sale',
+        price: s.price?.amount?.native || 0,
+        start_time: s.startTime ? new Date(s.startTime * 1000).toISOString() : null,
+        end_time: s.endTime ? new Date(s.endTime * 1000).toISOString() : null,
+        max_per_wallet: s.maxMintsPerWallet || null,
+      }));
+    }
     if (col?.saleConfig) {
       const cfg = col.saleConfig;
-      return [{
-        stage: 'public-sale',
+      return [{ stage: 'public-sale',
         price: col.floorAsk?.price?.amount?.native || 0,
         start_time: cfg.publicSaleStart ? new Date(cfg.publicSaleStart * 1000).toISOString() : null,
         end_time: cfg.publicSaleEnd ? new Date(cfg.publicSaleEnd * 1000).toISOString() : null,
-        max_per_wallet: cfg.maxSalePurchasePerAddress || null,
-      }];
+        max_per_wallet: cfg.maxSalePurchasePerAddress || null }];
     }
   } catch(e) {}
   return [];
@@ -710,10 +721,11 @@ document.querySelectorAll('#modeBar .mode-tab').forEach(b => b.addEventListener(
 }));
 
 function getOptions() {
+  const manualPrc = parseFloat($('mPrc')?.value);
   return {
     maxGas: parseInt($('mGas').value) || 50,
     tip: parseFloat($('mTip').value) || 2,
-    manualPrice: COL.price || null
+    manualPrice: (manualPrc > 0 ? manualPrc : null) || COL.price || null
   };
 }
 
