@@ -463,12 +463,17 @@ async function fetchCollection() {
 
     COL.phases = phases;
 
-    if (detectedPrice) {
+    // Price priority: phases (listed mint price) → on-chain detected → API floor
+    const phasePrice = phases?.[0]?.price ? parseFloat(phases[0].price) : 0;
+    if (phasePrice > 0) {
+      COL.price = phasePrice;
+      log('Price from mint phase: ' + phasePrice.toFixed(4) + ' ETH', 'ok');
+    } else if (detectedPrice) {
       COL.price = parseFloat(detectedPrice);
-      log('Price detected: ' + detectedPrice + ' ETH', 'ok');
+      log('Price detected (on-chain): ' + detectedPrice + ' ETH', 'ok');
     } else if (floor > 0) {
       COL.price = floor;
-      log('Price from API: ' + floor.toFixed(4) + ' ETH', 'info');
+      log('Price from API floor: ' + floor.toFixed(4) + ' ETH', 'info');
     } else {
       log('Price not auto-detected — enter manually', 'warn');
     }
@@ -500,15 +505,46 @@ async function fetchCollection() {
    FETCH MINT PHASES from OpenSea
 ══════════════════════════════════════ */
 async function fetchMintPhases(slug) {
+  // ── OpenSea mint_stages (returns price_per_token in wei) ──
   try {
     const d = await fetchWithFallback(
       'https://api.opensea.io/api/v2/collections/' + slug + '/mint_stages',
-      { timeoutMs: 5000 }
+      { timeoutMs: 6000, headers: OPENSEA_HEADERS }
     );
-    if (d?.mint_stages?.length) return d.mint_stages;
+    if (d?.mint_stages?.length) {
+      // Normalise price: price_per_token is in wei (string), convert to ETH
+      return d.mint_stages.map(s => ({
+        ...s,
+        price: s.price_per_token
+          ? parseFloat(ethers.utils.formatEther(s.price_per_token))
+          : (s.price != null ? parseFloat(s.price) : 0)
+      }));
+    }
   } catch(e) {}
 
-  // Fallback: try Reservoir saleConfig
+  // ── OpenSea drops API — has mint_price in USD + ETH ──
+  try {
+    const d = await fetchWithFallback(
+      'https://api.opensea.io/api/v2/drops?collection_slug=' + encodeURIComponent(slug),
+      { timeoutMs: 6000, headers: OPENSEA_HEADERS }
+    );
+    const drop = d?.results?.[0] || d?.drops?.[0];
+    if (drop) {
+      const priceUSD = drop.mint_price || drop.price || 0;
+      const priceETH = S.ethPrice > 0 && priceUSD > 0 ? priceUSD / S.ethPrice : 0;
+      return [{
+        stage: drop.stage || 'public-sale',
+        name: drop.name || 'Public Sale',
+        price: priceETH,
+        price_usd: priceUSD,
+        start_time: drop.start_date || drop.mint_start_date || null,
+        end_time: drop.end_date || drop.mint_end_date || null,
+        max_per_wallet: drop.max_per_wallet || null,
+      }];
+    }
+  } catch(e) {}
+
+  // ── Reservoir saleConfig fallback ──
   try {
     const d = await fetchWithFallback(
       'https://api.reservoir.tools/collections/v7?slug=' + encodeURIComponent(slug),
