@@ -404,3 +404,15 @@ body{
   .mc-row{grid-template-columns:1fr;}
   .tc-meta{grid-template-columns:1fr 1fr;}
 }
+
+/* ── FLOOR PILL ── */
+.col-stats-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.floor-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 10px;border-radius:20px;
+  font-size:10px;font-weight:700;
+  background:rgba(124,47,212,.08);
+  border:1px solid rgba(124,47,212,.2);
+  color:var(--acc2);
+  white-space:nowrap;
+}
