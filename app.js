@@ -21,7 +21,7 @@ const S = {
 };
 
 const COL = {
-  contract: null, name: '', price: 0,
+  contract: null, name: '', price: 0, floor: 0,
   supply: 0, minted: 0, slug: '', platform: '',
   phases: [], soldOut: false
 };
@@ -362,6 +362,7 @@ async function fetchCollection() {
   log('Resolving: ' + parsed.value);
   $('colCard').classList.remove('show');
   if ($('mPrc')) $('mPrc').value = '';
+  stopRefresh();
 
   let contract = null, name = 'Collection';
   let image = '', banner = '', twitterUrl = '', osUrl = '';
@@ -443,6 +444,7 @@ async function fetchCollection() {
     COL.contract = contract;
     COL.name = name;
     COL.price = floor;
+    COL.floor = floor;
     COL.slug = parsed.value;
     COL.platform = parsed.type === 'slug' ? 'opensea' : parsed.platform;
 
@@ -464,20 +466,33 @@ async function fetchCollection() {
 
     COL.phases = phases;
 
-    // Price priority: phases (listed mint price) → on-chain detected → API floor
-    const phasePrice = phases?.[0]?.price ? parseFloat(phases[0].price) : 0;
+    // Price priority: phases → on-chain detected → free
+    // floor price = secondary market, NEVER used as mint price
+    const phasesResolved = Array.isArray(phases) && phases.length > 0;
+    const phasePrice     = phasesResolved ? parseFloat(phases[0].price) || 0 : null;
+
     if (phasePrice > 0) {
+      // Drops API returned a real price
       COL.price = phasePrice;
       if ($('mPrc') && !$('mPrc').value) $('mPrc').value = phasePrice.toFixed(4);
-      log('Price from mint phase: ' + phasePrice.toFixed(4) + ' ETH', 'ok');
-    } else if (detectedPrice) {
+      log('Mint price: ' + phasePrice.toFixed(4) + ' ETH (from drops API)', 'ok');
+    } else if (phasesResolved && phasePrice === 0) {
+      // Drops API responded — price is 0 = confirmed FREE MINT
+      COL.price = 0;
+      if ($('mPrc')) $('mPrc').value = '';
+  stopRefresh();
+      log('Mint price: FREE (confirmed by drops API)', 'ok');
+    } else if (detectedPrice && parseFloat(detectedPrice) > 0) {
+      // On-chain getter found a price
       COL.price = parseFloat(detectedPrice);
-      log('Price detected (on-chain): ' + detectedPrice + ' ETH', 'ok');
-    } else if (floor > 0) {
-      COL.price = floor;
-      log('Price from API floor: ' + floor.toFixed(4) + ' ETH', 'info');
+      if ($('mPrc') && !$('mPrc').value) $('mPrc').value = parseFloat(detectedPrice).toFixed(4);
+      log('Mint price: ' + detectedPrice + ' ETH (on-chain detected)', 'ok');
     } else {
-      log('Price not auto-detected — enter manually', 'warn');
+      // No price found anywhere — assume free, let user override
+      COL.price = 0;
+      if ($('mPrc')) $('mPrc').value = '';
+  stopRefresh();
+      log('Mint price: FREE (no price getter — enter manually if paid)', 'ok');
     }
 
     // Render phases with full data
@@ -488,6 +503,9 @@ async function fetchCollection() {
       setStatus('⚠️ This collection is SOLD OUT (' + minted.toLocaleString() + '/' + supply.toLocaleString() + ' minted)', 'warn');
       log('SOLD OUT: ' + name, 'warn');
     }
+
+    // Start auto-refresh
+    startRefresh();
 
     $('limitNote').classList.remove('show');
     if (COL.supply > 0) {
@@ -507,14 +525,33 @@ async function fetchCollection() {
    FETCH MINT PHASES from OpenSea
 ══════════════════════════════════════ */
 async function fetchMintPhases(slug) {
-  // ── 1. OpenSea mint_stages — price_per_token in wei ──
+  // ── 1. OpenSea Drops API — correct endpoint: /api/v2/drops/{slug} ──
+  try {
+    const d = await fetchWithFallback(
+      'https://api.opensea.io/api/v2/drops/' + slug,
+      { timeoutMs: 7000, headers: OPENSEA_HEADERS }
+    );
+    // Response has d.stages[] each with { name, price, start_time, end_time, max_per_wallet }
+    if (d?.stages?.length) {
+      return d.stages.map(s => ({
+        stage:          s.stage || s.name || 'public-sale',
+        name:           s.name  || 'Public Sale',
+        price:          s.price != null ? parseFloat(s.price) : 0,
+        start_time:     s.start_time || null,
+        end_time:       s.end_time   || null,
+        max_per_wallet: s.max_per_wallet || null,
+      }));
+    }
+  } catch(e) {}
+
+  // ── 2. OpenSea mint_stages — price_per_token in wei ──
   try {
     const d = await fetchWithFallback(
       'https://api.opensea.io/api/v2/collections/' + slug + '/mint_stages',
       { timeoutMs: 6000, headers: OPENSEA_HEADERS }
     );
     if (d?.mint_stages?.length) {
-      const stages = d.mint_stages.map(s => {
+      return d.mint_stages.map(s => {
         let price = 0;
         if (s.price_per_token && s.price_per_token !== '0') {
           try { price = parseFloat(ethers.utils.formatEther(s.price_per_token)); } catch(e2) {}
@@ -523,28 +560,6 @@ async function fetchMintPhases(slug) {
         }
         return { ...s, price };
       });
-      if (stages.length > 0) return stages;
-    }
-  } catch(e) {}
-
-  // ── 2. OpenSea collection drops endpoint ──
-  try {
-    const d = await fetchWithFallback(
-      'https://api.opensea.io/api/v2/collections/' + slug + '/drops',
-      { timeoutMs: 6000, headers: OPENSEA_HEADERS }
-    );
-    const drop = d?.drops?.[0] || d?.results?.[0] || (Array.isArray(d) ? d[0] : null);
-    if (drop) {
-      let price = 0;
-      if (drop.price_per_token && drop.price_per_token !== '0') {
-        try { price = parseFloat(ethers.utils.formatEther(drop.price_per_token)); } catch(e2) {}
-      }
-      if (!price && drop.mint_price && S.ethPrice > 0) {
-        price = parseFloat(drop.mint_price) / S.ethPrice;
-      }
-      return [{ stage: 'public-sale', name: 'Public Sale', price,
-        start_time: drop.start_date || null, end_time: drop.end_date || null,
-        max_per_wallet: drop.max_per_wallet || null }];
     }
   } catch(e) {}
 
@@ -701,6 +716,17 @@ function renderColCard({ name, image, banner, contract, supply, minted, floor, t
   if (twitterUrl) links.push('<a class="col-link" href="' + twitterUrl + '" target="_blank" rel="noopener">X</a>');
   links.push('<a class="col-link" href="https://etherscan.io/address/' + contract + '" target="_blank" rel="noopener">Etherscan</a>');
   $('colLinks').innerHTML = links.join('');
+
+  // Floor price display
+  const floorEl = $('colFloor');
+  if (floorEl) {
+    if (floor > 0) {
+      floorEl.textContent = 'Floor: ' + floor.toFixed(4) + ' Ξ';
+      floorEl.style.display = 'inline-flex';
+    } else {
+      floorEl.style.display = 'none';
+    }
+  }
 
   renderPhase(floor, supply);
 
@@ -990,6 +1016,86 @@ window.togglePKSection = function() {
   const s = $('pkSection');
   if (s) s.style.display = s.style.display === 'none' ? 'block' : 'none';
 };
+
+
+/* ══════════════════════════════════════
+   AUTO-REFRESH — polls stats every 30s
+   Updates minted count, progress bar, floor
+══════════════════════════════════════ */
+let _refreshTimer = null;
+
+function startRefresh() {
+  stopRefresh();
+  _refreshTimer = setInterval(refreshStats, 30000);
+  log('Auto-refresh started (every 30s)', 'info');
+}
+
+function stopRefresh() {
+  if (_refreshTimer) { clearInterval(_refreshTimer); _refreshTimer = null; }
+}
+
+async function refreshStats() {
+  if (!COL.contract && !COL.slug) return;
+  try {
+    // Re-fetch stats from OpenSea
+    const slug = COL.slug || '';
+    let minted = COL.minted, floor = COL.floor || 0;
+
+    if (slug) {
+      try {
+        const sd = await fetchWithFallback(
+          'https://api.opensea.io/api/v2/collections/' + slug + '/stats',
+          { timeoutMs: 5000, headers: OPENSEA_HEADERS }
+        );
+        if (sd?.total) {
+          minted = sd.total.count  || COL.minted;
+          floor  = sd.total.floor_price || 0;
+        }
+      } catch(e) {}
+    }
+
+    // Re-read totalSupply from chain
+    try {
+      const provider = window.ethereum
+        ? new ethers.providers.Web3Provider(window.ethereum)
+        : new ethers.providers.JsonRpcProvider('https://ethereum.publicnode.com');
+      const abi = ['function totalSupply() view returns (uint256)'];
+      const con = new ethers.Contract(COL.contract, abi, provider);
+      const ts = (await con.totalSupply()).toNumber();
+      if (ts > 0) minted = ts;
+    } catch(e) {}
+
+    // Update state
+    COL.minted = minted;
+    if (floor > 0) COL.floor = floor;
+
+    // Update UI
+    const supply = COL.supply;
+    const pct = supply > 0 ? Math.min(100, Math.round(minted / supply * 100)) : 0;
+    $('progressFill').style.width = pct + '%';
+    $('progressLabel').textContent = pct + '% minted';
+    $('progressVal').textContent = minted.toLocaleString() + (supply > 0 ? ' / ' + supply.toLocaleString() : '');
+
+    // Update floor
+    const floorEl = $('colFloor');
+    if (floorEl && floor > 0) {
+      floorEl.textContent = 'Floor: ' + floor.toFixed(4) + ' Ξ';
+      floorEl.style.display = 'inline-flex';
+    }
+
+    // Update limit note
+    if (supply > 0) {
+      const remaining = Math.max(0, supply - minted);
+      $('limitText').textContent = supply.toLocaleString() + ' total supply · ' + remaining.toLocaleString() + ' remaining';
+    }
+
+    // Sold out check
+    if (supply > 0 && minted >= supply) {
+      setStatus('⚠️ SOLD OUT — ' + supply.toLocaleString() + ' / ' + supply.toLocaleString() + ' minted', 'warn');
+    }
+
+  } catch(e) {}
+}
 
 async function init() {
   // Restore persisted tasks
