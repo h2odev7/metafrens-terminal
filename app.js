@@ -623,12 +623,17 @@ function renderPhases(phases, supply, minted, detectedPrice) {
 
   const html = phases.map((ph, i) => {
     const price = ph.price != null ? parseFloat(ph.price) : (detectedPrice ? parseFloat(detectedPrice) : 0);
-    const startTime = fmtPhaseTime(ph.start_time);
-    const isLive = !startTime; // no countdown = already started
+    const now = new Date();
+    const start = ph.start_time ? new Date(ph.start_time) : null;
+    const end   = ph.end_time   ? new Date(ph.end_time)   : null;
+    const started = !start || start <= now;
+    const ended   = end && end <= now;
+    const isLive  = started && !ended;
     const isSoldOut = soldOut && isLive;
 
-    let timerClass = isSoldOut ? 'sold-out' : isLive ? 'live' : 'soon';
-    let timerText  = isSoldOut ? 'SOLD OUT' : isLive ? 'LIVE' : startTime;
+    const startTime = (!started && start) ? fmtPhaseTime(ph.start_time) : null;
+    let timerClass = isSoldOut ? 'sold-out' : ended ? 'ended' : isLive ? 'live' : 'soon';
+    let timerText  = isSoldOut ? 'SOLD OUT' : ended ? 'ENDED' : isLive ? 'LIVE' : startTime;
 
     const stageName = (ph.stage || ph.name || (i === 0 ? 'PUBLIC MINT' : 'PHASE ' + (i+1)))
       .replace(/-/g, ' ').toUpperCase();
@@ -728,8 +733,7 @@ function renderColCard({ name, image, banner, contract, supply, minted, floor, t
     }
   }
 
-  renderPhase(floor, supply);
-
+  // phases rendered separately after fetchMintPhases resolves
   $('colCard').classList.add('show');
 }
 
@@ -1026,8 +1030,8 @@ let _refreshTimer = null;
 
 function startRefresh() {
   stopRefresh();
-  _refreshTimer = setInterval(refreshStats, 30000);
-  log('Auto-refresh started (every 30s)', 'info');
+  _refreshTimer = setInterval(refreshStats, 15000);
+  log('Auto-refresh: every 15s', 'info');
 }
 
 function stopRefresh() {
@@ -1037,10 +1041,10 @@ function stopRefresh() {
 async function refreshStats() {
   if (!COL.contract && !COL.slug) return;
   try {
-    // Re-fetch stats from OpenSea
     const slug = COL.slug || '';
     let minted = COL.minted, floor = COL.floor || 0;
 
+    // ── Fetch stats (minted count + floor) ──
     if (slug) {
       try {
         const sd = await fetchWithFallback(
@@ -1048,13 +1052,13 @@ async function refreshStats() {
           { timeoutMs: 5000, headers: OPENSEA_HEADERS }
         );
         if (sd?.total) {
-          minted = sd.total.count  || COL.minted;
+          minted = sd.total.count       || COL.minted;
           floor  = sd.total.floor_price || 0;
         }
       } catch(e) {}
     }
 
-    // Re-read totalSupply from chain
+    // ── Re-read totalSupply from chain (most accurate) ──
     try {
       const provider = window.ethereum
         ? new ethers.providers.Web3Provider(window.ethereum)
@@ -1065,33 +1069,50 @@ async function refreshStats() {
       if (ts > 0) minted = ts;
     } catch(e) {}
 
-    // Update state
+    // ── Re-fetch phases to show active stage ──
+    if (slug) {
+      try {
+        const phases = await fetchMintPhases(slug);
+        if (phases?.length) {
+          COL.phases = phases;
+          renderPhases(phases, COL.supply, minted, null);
+        }
+      } catch(e) {}
+    }
+
+    // ── Update state ──
     COL.minted = minted;
     if (floor > 0) COL.floor = floor;
 
-    // Update UI
+    // ── Update progress bar ──
     const supply = COL.supply;
     const pct = supply > 0 ? Math.min(100, Math.round(minted / supply * 100)) : 0;
     $('progressFill').style.width = pct + '%';
     $('progressLabel').textContent = pct + '% minted';
     $('progressVal').textContent = minted.toLocaleString() + (supply > 0 ? ' / ' + supply.toLocaleString() : '');
 
-    // Update floor
+    // ── Update floor pill ──
     const floorEl = $('colFloor');
-    if (floorEl && floor > 0) {
-      floorEl.textContent = 'Floor: ' + floor.toFixed(4) + ' Ξ';
-      floorEl.style.display = 'inline-flex';
+    if (floorEl) {
+      if (floor > 0) {
+        floorEl.textContent = 'Floor: ' + floor.toFixed(4) + ' Ξ';
+        floorEl.style.display = 'inline-flex';
+      } else {
+        floorEl.style.display = 'none';
+      }
     }
 
-    // Update limit note
+    // ── Update limit note ──
     if (supply > 0) {
       const remaining = Math.max(0, supply - minted);
+      $('limitNote').classList.add('show');
       $('limitText').textContent = supply.toLocaleString() + ' total supply · ' + remaining.toLocaleString() + ' remaining';
     }
 
-    // Sold out check
+    // ── Sold out check ──
     if (supply > 0 && minted >= supply) {
       setStatus('⚠️ SOLD OUT — ' + supply.toLocaleString() + ' / ' + supply.toLocaleString() + ' minted', 'warn');
+      stopRefresh();
     }
 
   } catch(e) {}
