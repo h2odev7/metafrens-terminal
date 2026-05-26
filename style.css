@@ -416,3 +416,6 @@ body{
   color:var(--acc2);
   white-space:nowrap;
 }
+
+.phase-timer.ended{color:var(--t2);border-color:var(--b0);background:var(--bg);}
+.phase-timer.sold-out{color:var(--err);border-color:rgba(220,38,38,.25);background:rgba(220,38,38,.06);}
