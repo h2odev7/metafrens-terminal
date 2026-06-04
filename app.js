@@ -9,7 +9,13 @@
 const OPENSEA_API_KEY = '5ba47a8af05f4082a613832c2dc30bcc';
 const OPENSEA_HEADERS = { 'Accept': 'application/json', 'x-api-key': OPENSEA_API_KEY };
 
-import { executeMint, detectPrice, createPrivateKeySigner, getPrivateKeyAddress } from './mintEngine.js';
+import {
+  executeMint, detectPrice, createPrivateKeySigner, getPrivateKeyAddress,
+  fetchABI, findMintFunctions
+} from './mintEngine.js';
+// NOTE: mintEngine.js does not export batchMint(); per the "treat as import / do not
+// modify" constraint, the batch loop below is orchestrated in app.js on top of the
+// real executeMint() export (one signed tx per call).
 
 const $ = id => document.getElementById(id);
 
@@ -442,6 +448,7 @@ async function fetchCollection() {
     COL.minted = minted > 0 ? minted : 0;
     COL.supply = supply > 0 ? supply : 0;
     COL.contract = contract;
+    if ($('bpContract')) $('bpContract').value = contract;
     COL.name = name;
     COL.price = floor;
     COL.floor = floor;
@@ -1023,6 +1030,276 @@ window.togglePKSection = function() {
 
 
 /* ══════════════════════════════════════
+   BOT PANEL — multi-wallet batch minting
+   Reuses mintEngine exports; never persists keys
+══════════════════════════════════════ */
+const BOT = {
+  wallets: [],     // [{ signer, address, balance }]
+  turbo: false,
+  running: false
+};
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function botProvider() {
+  return window.ethereum
+    ? new ethers.providers.Web3Provider(window.ethereum)
+    : new ethers.providers.JsonRpcProvider('https://ethereum.publicnode.com');
+}
+
+/* ── Mint-log panel — color-coded, auto-scrolls to bottom ── */
+function botLog(msg, t = '') {
+  const el = $('bpLog');
+  if (!el) return;
+  const d = document.createElement('div');
+  // executeMint() emits ('msg') and ('msg','warn'); other callers use success/error
+  d.className = 'log-line ' + (t === 'ok' ? 'success' : t === 'err' ? 'error' : t);
+  d.innerHTML = '<span class="log-ts">[' + new Date().toLocaleTimeString('en-US', { hour12: false }) + ']</span>' + msg;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight; // auto-scroll to newest entry
+}
+
+/* ── 1. MULTI-WALLET INPUT ── */
+function parseWallets() {
+  const lines = ($('bpWallets').value || '').split('\n').map(l => l.trim()).filter(Boolean);
+  BOT.wallets = [];
+  let invalid = 0;
+  for (const line of lines) {
+    try {
+      const signer = createPrivateKeySigner(line);
+      BOT.wallets.push({ signer, address: signer.address, balance: null });
+    } catch(e) { invalid++; }
+  }
+  renderWalletList();
+  botLog('Parsed ' + BOT.wallets.length + ' wallet(s)' + (invalid ? ' · ' + invalid + ' invalid skipped' : ''),
+    invalid ? 'warn' : 'success');
+}
+
+function renderWalletList() {
+  const cnt = $('bpWalletCount');
+  if (cnt) cnt.textContent = BOT.wallets.length + ' wallet' + (BOT.wallets.length !== 1 ? 's' : '');
+  const list = $('bpWalletList');
+  if (!list) return;
+  list.innerHTML = BOT.wallets.map((w, i) =>
+    '<div class="wallet-list-item">' +
+      '<span class="wallet-list-addr">' + (i + 1) + '. ' + w.address.slice(0, 8) + '…' + w.address.slice(-6) + '</span>' +
+      '<span class="wallet-list-bal" id="bpBal' + i + '">' + (w.balance != null ? w.balance + ' Ξ' : '— Ξ') + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+async function checkBalances() {
+  if (!BOT.wallets.length) { botLog('Parse wallets first.', 'warn'); return; }
+  botLog('Checking balances…');
+  for (let i = 0; i < BOT.wallets.length; i++) {
+    const w = BOT.wallets[i];
+    try {
+      const bal = await w.signer.getBalance();
+      w.balance = parseFloat(ethers.utils.formatEther(bal)).toFixed(4);
+      const el = $('bpBal' + i); if (el) el.textContent = w.balance + ' Ξ';
+    } catch(e) {
+      const el = $('bpBal' + i); if (el) el.textContent = 'err';
+      botLog('Balance failed for ' + w.address.slice(0, 10) + '…', 'error');
+    }
+  }
+  botLog('Balance check complete.', 'success');
+}
+
+/* ── 3. GAS CONTROLS ── */
+function toggleTurbo() {
+  BOT.turbo = !BOT.turbo;
+  const t = $('bpTurbo');
+  if (t) { t.classList.toggle('on', BOT.turbo); t.setAttribute('aria-checked', BOT.turbo ? 'true' : 'false'); }
+  if ($('bpMaxGas')) $('bpMaxGas').disabled = BOT.turbo; // manual gas locked in turbo mode
+  botLog('Turbo mode ' + (BOT.turbo ? 'ON — using live fee data' : 'OFF — manual gas'), 'success');
+}
+
+async function refreshLiveGas() {
+  const el = $('bpLiveGas');
+  if (!el) return;
+  try {
+    const fee = await botProvider().getFeeData();
+    if (fee.gasPrice) el.value = parseFloat(ethers.utils.formatUnits(fee.gasPrice, 'gwei')).toFixed(2) + ' gwei';
+  } catch(e) {}
+}
+
+// Build executeMint options — live fee data when Turbo is on, manual inputs otherwise
+async function getBotOptions() {
+  let maxGas = parseFloat($('bpMaxGas')?.value) || 50;
+  let tip    = parseFloat($('bpTip')?.value)    || 2;
+  if (BOT.turbo) {
+    try {
+      const fee = await botProvider().getFeeData();
+      if (fee.maxFeePerGas)         maxGas = Math.ceil(parseFloat(ethers.utils.formatUnits(fee.maxFeePerGas, 'gwei')));
+      if (fee.maxPriorityFeePerGas) tip    = parseFloat(parseFloat(ethers.utils.formatUnits(fee.maxPriorityFeePerGas, 'gwei')).toFixed(2));
+      botLog('Turbo gas: max ' + maxGas + ' / tip ' + tip + ' gwei', 'success');
+    } catch(e) { botLog('Live fee fetch failed — falling back to manual gas', 'warn'); }
+  }
+  const manualPrc = parseFloat($('mPrc')?.value);
+  return {
+    maxGas, tip,
+    manualPrice: (manualPrc > 0 ? manualPrc : null) || COL.price || null
+  };
+}
+
+/* ── 2. BATCH MINT — orchestrates executeMint per wallet ── */
+async function batchMint() {
+  if (BOT.running) { botLog('Batch already running.', 'warn'); return; }
+  if (!BOT.wallets.length) { botLog('Parse wallets first.', 'error'); return; }
+
+  const contract = ($('bpContract')?.value.trim() || COL.contract || '').trim();
+  if (!contract.match(/^0x[a-fA-F0-9]{40}$/)) { botLog('Enter a valid contract address.', 'error'); return; }
+
+  const total = Math.max(1, parseInt($('bpTotal')?.value) || 1); // per wallet
+  const perTx = Math.max(1, parseInt($('bpPerTx')?.value) || 1);
+  const delay = Math.max(0, parseInt($('bpDelay')?.value) || 0);
+  const options = await getBotOptions();
+
+  BOT.running = true;
+  if ($('bpRunBtn')) $('bpRunBtn').disabled = true;
+  if ($('bpSummary')) $('bpSummary').innerHTML = '';
+  botLog('▶ Batch started — ' + BOT.wallets.length + ' wallet(s), ' + total + '/wallet, ' + perTx + '/tx, ' + delay + 'ms delay', 'success');
+
+  const results = [];
+  for (let wi = 0; wi < BOT.wallets.length; wi++) {
+    const w = BOT.wallets[wi];
+    botLog('Wallet ' + (wi + 1) + '/' + BOT.wallets.length + ': ' + w.address.slice(0, 10) + '…');
+    let remaining = total;
+    while (remaining > 0) {
+      const qty = Math.min(perTx, remaining);
+      try {
+        const result = await executeMint(contract, w.signer, qty, botLog, options);
+        if (result?.success) {
+          const detail = await inspectReceipt(w, result.hash, options);
+          results.push({ address: w.address, success: true, hash: result.hash, qty, ...detail });
+          botLog('✅ ' + w.address.slice(0, 8) + '… minted ' + qty +
+            (detail.tokenIds.length ? ' · #' + detail.tokenIds.join(', #') : ''), 'success');
+        } else {
+          results.push({ address: w.address, success: false, qty });
+        }
+      } catch(e) {
+        results.push({ address: w.address, success: false, qty, error: e.message });
+        botLog('❌ ' + w.address.slice(0, 8) + '… ' + (e.message || '').slice(0, 80), 'error');
+      }
+      remaining -= qty;
+      if (remaining > 0 && delay) await sleep(delay);
+    }
+    if (wi < BOT.wallets.length - 1 && delay) await sleep(delay);
+  }
+
+  BOT.running = false;
+  if ($('bpRunBtn')) $('bpRunBtn').disabled = false;
+  renderSummary(results);
+  botLog('■ Batch complete — ' + results.filter(r => r.success).length + '/' + results.length + ' tx succeeded.', 'success');
+}
+
+// Pull token IDs (ERC-721 Transfer logs) + total ETH spent from a confirmed tx
+async function inspectReceipt(w, hash, options) {
+  const out = { tokenIds: [], ethSpent: 0 };
+  try {
+    const provider = w.signer.provider;
+    const [receipt, tx] = await Promise.all([
+      provider.getTransactionReceipt(hash),
+      provider.getTransaction(hash)
+    ]);
+    let spent = ethers.constants.Zero;
+    if (tx?.value) spent = spent.add(tx.value);
+    if (receipt?.gasUsed) {
+      const gp = receipt.effectiveGasPrice || tx?.gasPrice || ethers.constants.Zero;
+      spent = spent.add(receipt.gasUsed.mul(gp));
+    }
+    out.ethSpent = parseFloat(ethers.utils.formatEther(spent));
+
+    const TRANSFER = ethers.utils.id('Transfer(address,address,uint256)');
+    const me = w.address.toLowerCase();
+    for (const lg of (receipt?.logs || [])) {
+      // ERC-721 Transfer = 4 topics (indexed from, to, tokenId)
+      if (lg.topics[0] === TRANSFER && lg.topics.length === 4) {
+        const to = '0x' + lg.topics[2].slice(26);
+        if (to.toLowerCase() === me) {
+          try { out.tokenIds.push(ethers.BigNumber.from(lg.topics[3]).toString()); } catch(e) {}
+        }
+      }
+    }
+  } catch(e) {}
+  return out;
+}
+
+/* ── 5. RESULT SUMMARY ── */
+function renderSummary(results) {
+  const box = $('bpSummary');
+  if (!box) return;
+  const ok       = results.filter(r => r.success);
+  const fail     = results.filter(r => !r.success);
+  const tokenIds = ok.flatMap(r => r.tokenIds || []);
+  const totalEth = ok.reduce((s, r) => s + (r.ethSpent || 0), 0);
+
+  const hashLinks = ok.map(r =>
+    '<a class="etherscan-link" href="https://etherscan.io/tx/' + r.hash + '" target="_blank" rel="noopener">' +
+      '<span class="es-hash">' + r.hash.slice(0, 12) + '…' + r.hash.slice(-6) + '</span></a>'
+  ).join('');
+
+  const tokenBadges = tokenIds.length
+    ? tokenIds.slice(0, 60).map(id => '<span class="token-id-badge">' + id + '</span>').join(' ')
+    : '<span style="color:var(--t2);font-size:11px;">none detected</span>';
+
+  box.innerHTML =
+    '<div class="result-summary-card">' +
+      '<div class="rs-title">Batch Result</div>' +
+      '<div class="rs-grid">' +
+        '<div class="rs-stat"><span class="rs-k">Succeeded</span><span class="rs-v ok">' + ok.length + '</span></div>' +
+        '<div class="rs-stat"><span class="rs-k">Failed</span><span class="rs-v ' + (fail.length ? 'err' : '') + '">' + fail.length + '</span></div>' +
+        '<div class="rs-stat"><span class="rs-k">Total ETH</span><span class="rs-v">' + totalEth.toFixed(5) + '</span></div>' +
+      '</div>' +
+      '<div class="rs-title" style="margin-top:14px;">Token IDs (' + tokenIds.length + ')</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:5px;">' + tokenBadges + '</div>' +
+      '<div class="rs-title" style="margin-top:14px;">Transactions</div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;">' +
+        (hashLinks || '<span style="color:var(--t2);font-size:11px;">none</span>') +
+      '</div>' +
+    '</div>';
+}
+
+/* ── 6. CONTRACT INSPECTOR ── */
+async function inspectContract() {
+  const contract = ($('bpContract')?.value.trim() || COL.contract || '').trim();
+  const box = $('bpInspector');
+  if (!contract.match(/^0x[a-fA-F0-9]{40}$/)) { botLog('Enter a valid contract address to inspect.', 'error'); return; }
+  if (box) box.innerHTML = '<div class="contract-inspector"><div class="ci-row"><span class="ci-k">Status</span><span class="ci-v">Inspecting…</span></div></div>';
+  botLog('Inspecting ' + contract.slice(0, 10) + '…');
+  try {
+    const abi = await fetchABI(contract);
+    const fns = findMintFunctions(abi);
+    let price = null;
+    try { price = await detectPrice(contract, botProvider()); } catch(e) {}
+
+    const fnList = fns.slice(0, 6).map(f => f.name + '(' + (f.inputs || []).map(i => i.type).join(',') + ')');
+    if (box) box.innerHTML =
+      '<div class="contract-inspector">' +
+        '<div class="ci-row"><span class="ci-k">ABI</span><span class="ci-v">verified ✓ · ' + abi.length + ' entries</span></div>' +
+        '<div class="ci-row"><span class="ci-k">Mint Fns</span><span class="ci-v">' + (fnList.length ? fnList.join(', ') : 'none detected') + '</span></div>' +
+        '<div class="ci-row"><span class="ci-k">Detected Price</span><span class="ci-v">' + (price ? price + ' ETH' : 'FREE / none') + '</span></div>' +
+      '</div>';
+    botLog('Inspector: ' + fns.length + ' mint fn(s), price ' + (price || 'free'), 'success');
+  } catch(e) {
+    if (box) box.innerHTML = '<div class="contract-inspector"><div class="ci-row"><span class="ci-k">Error</span><span class="ci-v" style="color:var(--err)">' + e.message + '</span></div></div>';
+    botLog('Inspect failed: ' + e.message, 'error');
+  }
+}
+
+/* ── Wire bot-panel controls (elements are static in index.html) ── */
+$('bpParseBtn')?.addEventListener('click', parseWallets);
+$('bpBalBtn')?.addEventListener('click', checkBalances);
+$('bpRunBtn')?.addEventListener('click', batchMint);
+$('bpInspectBtn')?.addEventListener('click', inspectContract);
+$('bpTurbo')?.addEventListener('click', toggleTurbo);
+$('bpClearLog')?.addEventListener('click', () => {
+  const el = $('bpLog');
+  if (el) el.innerHTML = '<div class="log-line"><span class="log-ts">[--:--]</span>Log cleared.</div>';
+});
+
+
+/* ══════════════════════════════════════
    AUTO-REFRESH — polls stats every 30s
    Updates minted count, progress bar, floor
 ══════════════════════════════════════ */
@@ -1132,6 +1409,8 @@ async function init() {
   setInterval(tickTasks, 1000);
   setInterval(loadPrices, 30000);
   setInterval(loadGas, 30000);
+  refreshLiveGas();
+  setInterval(refreshLiveGas, 15000); // bot-panel live gas display
   const t = new Date(Date.now() + 3600e3);
   if ($('mTime')) $('mTime').value = t.toISOString().slice(0, 16);
   await Promise.all([loadPrices(), loadGas()]);

@@ -187,6 +187,124 @@
 
   </div><!-- /page-grid -->
 
+  <!-- ══════════════════════════════════════════════════════════════
+       BOT PANEL — expanded mint bot controls
+       All new bot UI lives inside #botPanel. IDs/classes below form the
+       contract shared with app.js (logic) and style.css (styling).
+
+       Multi-wallet   : #walletsSection #walletList #walletCount #loadWalletsBtn
+       Batch mint      : #batchSection #batchQty #batchDelay #batchMintBtn #batchStopBtn
+       Gas controls    : #gasSection #gasMax #gasTip #turboToggle
+       Mint log        : #mintLogSection #mintLog
+       Result summary  : #resultSummary (hidden) #resultSuccess #resultFailed #resultTotal #resultList
+       Contract inspect: #contractInspector #inspectAddr #inspectBtn #inspectResult
+                         #inspectName #inspectSymbol #inspectSupply #inspectMaxSupply
+                         #inspectPrice #inspectMintFn
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="bot-panel" id="botPanel">
+    <div class="bot-panel-title">Bot Console</div>
+    <div class="bot-grid">
+
+      <!-- MULTI-WALLET -->
+      <section class="bot-section" id="walletsSection">
+        <div class="bot-section-head">
+          <span class="bot-section-title">Wallets</span>
+          <span class="bot-pill" id="walletCount">0 wallets</span>
+        </div>
+        <textarea id="walletList" class="wallet-list"
+          placeholder="One wallet per line — private key (0x…) or address (0x…)"
+          spellcheck="false" autocomplete="off"></textarea>
+        <button class="bot-btn" id="loadWalletsBtn">Load Wallets</button>
+      </section>
+
+      <!-- BATCH MINT CONTROLS -->
+      <section class="bot-section" id="batchSection">
+        <div class="bot-section-head">
+          <span class="bot-section-title">Batch Mint</span>
+        </div>
+        <div class="bot-row">
+          <div class="bot-field">
+            <label for="batchQty">Qty / Wallet</label>
+            <input type="number" id="batchQty" value="1" min="1"/>
+          </div>
+          <div class="bot-field">
+            <label for="batchDelay">Delay (ms)</label>
+            <input type="number" id="batchDelay" value="0" min="0" step="100"/>
+          </div>
+        </div>
+        <div class="bot-btn-row">
+          <button class="bot-btn primary" id="batchMintBtn">⚡ Mint All Wallets</button>
+          <button class="bot-btn danger" id="batchStopBtn" disabled>Stop</button>
+        </div>
+      </section>
+
+      <!-- GAS CONTROLS + TURBO -->
+      <section class="bot-section" id="gasSection">
+        <div class="bot-section-head">
+          <span class="bot-section-title">Gas Controls</span>
+        </div>
+        <div class="bot-row">
+          <div class="bot-field">
+            <label for="gasMax">Max Gas (gwei)</label>
+            <input type="number" id="gasMax" placeholder="auto" min="0"/>
+          </div>
+          <div class="bot-field">
+            <label for="gasTip">Priority Tip (gwei)</label>
+            <input type="number" id="gasTip" placeholder="auto" min="0" step="0.1"/>
+          </div>
+        </div>
+        <label class="turbo-toggle" for="turboToggle">
+          <input type="checkbox" id="turboToggle"/>
+          <span class="turbo-track"><span class="turbo-thumb"></span></span>
+          <span class="turbo-text">Turbo Mode <span class="turbo-hint">— aggressive gas, parallel sends</span></span>
+        </label>
+      </section>
+
+      <!-- CONTRACT INSPECTOR -->
+      <section class="bot-section" id="contractInspector">
+        <div class="bot-section-head">
+          <span class="bot-section-title">Contract Inspector</span>
+        </div>
+        <div class="bot-row inspect-row">
+          <input type="text" id="inspectAddr" class="inspect-input"
+            placeholder="0x contract address…" spellcheck="false" autocomplete="off"/>
+          <button class="bot-btn" id="inspectBtn">Inspect</button>
+        </div>
+        <div class="inspect-grid" id="inspectResult" hidden>
+          <div class="inspect-item"><span class="ik">Name</span><span class="iv" id="inspectName">—</span></div>
+          <div class="inspect-item"><span class="ik">Symbol</span><span class="iv" id="inspectSymbol">—</span></div>
+          <div class="inspect-item"><span class="ik">Total Supply</span><span class="iv" id="inspectSupply">—</span></div>
+          <div class="inspect-item"><span class="ik">Max Supply</span><span class="iv" id="inspectMaxSupply">—</span></div>
+          <div class="inspect-item"><span class="ik">Mint Price</span><span class="iv" id="inspectPrice">—</span></div>
+          <div class="inspect-item"><span class="ik">Mint Fn</span><span class="iv" id="inspectMintFn">—</span></div>
+        </div>
+      </section>
+
+    </div><!-- /bot-grid -->
+
+    <!-- MINT LOG -->
+    <section class="bot-section bot-section-wide" id="mintLogSection">
+      <div class="bot-section-head">
+        <span class="bot-section-title">Mint Log</span>
+      </div>
+      <div class="mint-log" id="mintLog"></div>
+    </section>
+
+    <!-- RESULT SUMMARY (hidden by default) -->
+    <div class="result-card" id="resultSummary" hidden>
+      <div class="bot-section-head">
+        <span class="bot-section-title">Mint Results</span>
+      </div>
+      <div class="result-stats">
+        <div class="result-stat ok"><span class="rs-v" id="resultSuccess">0</span><span class="rs-l">Success</span></div>
+        <div class="result-stat err"><span class="rs-v" id="resultFailed">0</span><span class="rs-l">Failed</span></div>
+        <div class="result-stat"><span class="rs-v" id="resultTotal">0</span><span class="rs-l">Total</span></div>
+      </div>
+      <div class="result-list" id="resultList"></div>
+    </div>
+
+  </div><!-- /botPanel -->
+
 </div><!-- /page -->
 
 <!-- WALLET MODAL -->
@@ -210,6 +328,8 @@
   <span id="themeIcon">○</span>
 </button>
 
+<!-- Runtime config (generated by scripts/write-config.mjs → window.METABOT_CONFIG) -->
+<script src="config.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

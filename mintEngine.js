@@ -99,11 +99,14 @@ export async function detectPrice(contractAddress, provider) {
 /* ══════════════════════════════════════
    BUILD ARGS
    Constructs calldata args from ABI input types
+   Supports optional merkleProof (bytes32[]) injection
 ══════════════════════════════════════ */
-export function buildArgs(fn, qty, addr) {
+export function buildArgs(fn, qty, addr, options = {}) {
   if (!fn.inputs || fn.inputs.length === 0) return [];
+  const merkleProof = options.merkleProof || [];
   return fn.inputs.map(inp => {
     const t = inp.type;
+    if (t === "bytes32[]") return merkleProof; // whitelist / merkle proof
     if (t.includes("uint")) return qty;
     if (t === "address")   return addr;
     if (t === "bool")      return true;
@@ -113,15 +116,109 @@ export function buildArgs(fn, qty, addr) {
 }
 
 /* ══════════════════════════════════════
+   MERKLE / WHITELIST DETECTION
+   True if the function expects a bytes32[] proof arg
+══════════════════════════════════════ */
+export function hasMerkleProof(fn) {
+  return !!(fn && fn.inputs && fn.inputs.some(inp => inp.type === "bytes32[]"));
+}
+
+/* ══════════════════════════════════════
+   SHARED HELPERS
+   sleep · fee computation (turbo) · retry · receipt enrichment
+══════════════════════════════════════ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isUserRejection(err) {
+  return err && (err.code === 4001 ||
+    /reject(ed)? by user|user rejected|user denied/i.test(err.message || ""));
+}
+
+/* Compute EIP-1559 fee overrides.
+   Turbo mode: maxFeePerGas = live baseFee * 2 + tip (read via getFeeData). */
+export async function computeFeeOverrides(provider, options = {}, log = () => {}) {
+  const { maxGas = 50, tip = 2, turbo = false } = options;
+  const tipWei = ethers.utils.parseUnits(String(tip), "gwei");
+
+  if (turbo && provider) {
+    try {
+      const feeData = await provider.getFeeData();
+      const baseFee = feeData.lastBaseFeePerGas || feeData.gasPrice;
+      if (baseFee) {
+        const maxFeePerGas = baseFee.mul(2).add(tipWei);
+        log("⚡ Turbo: baseFee " + ethers.utils.formatUnits(baseFee, "gwei") +
+            " gwei → maxFee " + ethers.utils.formatUnits(maxFeePerGas, "gwei") + " gwei");
+        return { maxFeePerGas, maxPriorityFeePerGas: tipWei };
+      }
+      log("Turbo: baseFee unavailable — falling back to manual gas", "warn");
+    } catch (e) {
+      log("Turbo: getFeeData failed (" + (e.message || e) + ") — manual gas", "warn");
+    }
+  }
+
+  return {
+    maxFeePerGas: ethers.utils.parseUnits(String(maxGas), "gwei"),
+    maxPriorityFeePerGas: tipWei
+  };
+}
+
+/* Run taskFn, retrying up to maxRetries on failure with exponential
+   backoff (1s, 2s, 4s …). User rejections are never retried. */
+export async function withRetry(taskFn, log = () => {}, maxRetries = 3) {
+  let lastErr;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await taskFn(attempt);
+    } catch (err) {
+      if (isUserRejection(err)) throw err;
+      lastErr = err;
+      if (attempt === maxRetries) break;
+      const delay = 1000 * Math.pow(2, attempt); // 1000, 2000, 4000…
+      const reason = (err.reason || err.message || String(err)).slice(0, 120);
+      log("Retry " + (attempt + 1) + "/" + maxRetries + " in " +
+          (delay / 1000) + "s — reason: " + reason, "warn");
+      await sleep(delay);
+    }
+  }
+  throw lastErr;
+}
+
+/* Parse receipt logs for ERC-721 Transfer events and return minted tokenIds.
+   ERC-721 Transfer has 4 topics (sig, from, to, tokenId); ERC-20 has 3. */
+// Computed lazily on first use — `ethers` is loaded async from a CDN, so we must
+// not touch it at module-import time (that would crash this ES module before the UI wires up).
+let _TRANSFER_TOPIC = null;
+export function parseMintedTokenIds(receipt, ownerAddr) {
+  const TRANSFER_TOPIC = _TRANSFER_TOPIC || (_TRANSFER_TOPIC = ethers.utils.id("Transfer(address,address,uint256)"));
+  const ids = [];
+  if (!receipt || !receipt.logs) return ids;
+  const owner = ownerAddr ? ownerAddr.toLowerCase() : null;
+  for (const lg of receipt.logs) {
+    if (!lg.topics || lg.topics.length !== 4 || lg.topics[0] !== TRANSFER_TOPIC) continue;
+    const to = ("0x" + lg.topics[2].slice(26)).toLowerCase();
+    if (owner && to !== owner) continue; // only tokens minted to this wallet
+    try {
+      ids.push(ethers.BigNumber.from(lg.topics[3]).toString());
+    } catch (e) {}
+  }
+  return ids;
+}
+
+/* ══════════════════════════════════════
    EXECUTE MINT — main entry point
    Route 1: ABI-aware + simulation
    Route 2: Brute-force signatures fallback
 ══════════════════════════════════════ */
 export async function executeMint(contractAddr, signer, qty, log, options = {}) {
   const {
-    maxGas    = 50,
-    tip       = 2,
-    manualPrice = null
+    maxGas      = 50,
+    tip         = 2,
+    manualPrice = null,
+    turbo       = false,   // mempool speed mode: baseFee*2 + tip
+    maxRetries  = 3,       // tx-failure retries with exponential backoff
+    merkleProof = null     // optional bytes32[] whitelist proof
   } = options;
 
   /* ── NETWORK CHECK — must be Ethereum Mainnet (chainId 1) ── */
@@ -139,9 +236,7 @@ export async function executeMint(contractAddr, signer, qty, log, options = {}) 
     log("Could not verify network — proceeding with caution", "warn");
   }
 
-  const maxFeePerGas         = ethers.utils.parseUnits(String(maxGas), "gwei");
-  const maxPriorityFeePerGas = ethers.utils.parseUnits(String(tip), "gwei");
-  const addr                 = await signer.getAddress();
+  const addr = await signer.getAddress();
 
   /* ── Route 1: ABI-aware ── */
   try {
@@ -167,7 +262,13 @@ export async function executeMint(contractAddr, signer, qty, log, options = {}) 
     for (const fn of mintFns) {
       try {
         log("Trying: " + fn.name + "()");
-        const args  = buildArgs(fn, qty, addr);
+        if (hasMerkleProof(fn)) {
+          if (merkleProof && merkleProof.length)
+            log("Merkle proof input detected — using provided proof (" + merkleProof.length + " elements)");
+          else
+            log("Merkle proof input detected but none provided — passing empty array", "warn");
+        }
+        const args  = buildArgs(fn, qty, addr, { merkleProof });
         let   value = unitPrice.mul(qty);
 
         // Simulate first
@@ -196,19 +297,21 @@ export async function executeMint(contractAddr, signer, qty, log, options = {}) 
           log("Gas estimation failed — using 300k fallback", "warn");
         }
 
-        const tx = await contract[fn.name](...args, {
-          value,
-          maxFeePerGas,
-          maxPriorityFeePerGas,
-          gasLimit
-        });
+        return await withRetry(async () => {
+          const fee = await computeFeeOverrides(signer.provider, options, log);
+          const tx  = await contract[fn.name](...args, { value, ...fee, gasLimit });
 
-        log("TX sent: " + tx.hash);
-        const receipt = await tx.wait();
-        const gasUsed = receipt.gasUsed?.toString() || '?';
-        const block = receipt.blockNumber || '?';
-        log("✅ Mint confirmed! Block " + block + " · Gas used: " + gasUsed);
-        return { success: true, hash: tx.hash, block, gasUsed };
+          log("TX sent: " + tx.hash);
+          const receipt = await tx.wait();
+          if (receipt.status === 0) throw new Error("Transaction reverted on-chain");
+
+          const tokenIds = parseMintedTokenIds(receipt, addr);
+          const gasUsed  = receipt.gasUsed?.toString() || '?';
+          const block    = receipt.blockNumber || '?';
+          log("✅ Mint confirmed! Block " + block + " · Gas used: " + gasUsed +
+              (tokenIds.length ? " · tokenIds: " + tokenIds.join(", ") : ""));
+          return { success: true, hash: tx.hash, block, gasUsed, tokenIds };
+        }, log, maxRetries);
 
       } catch(err) {
         if (err.code === 4001) throw new Error("Rejected by user");
@@ -255,21 +358,27 @@ export async function executeMint(contractAddr, signer, qty, log, options = {}) 
         log("Gas estimated: " + gasLimit);
       } catch(e) {}
 
-      const tx = await signer.sendTransaction({
-        to: contractAddr,
-        value: bruteValue,
-        data,
-        maxFeePerGas,
-        maxPriorityFeePerGas,
-        gasLimit
-      });
+      return await withRetry(async () => {
+        const fee = await computeFeeOverrides(signer.provider, options, log);
+        const tx  = await signer.sendTransaction({
+          to: contractAddr,
+          value: bruteValue,
+          data,
+          ...fee,
+          gasLimit
+        });
 
-      log("TX sent: " + tx.hash);
-      const receipt = await tx.wait();
-      const gasUsed = receipt.gasUsed?.toString() || '?';
-      const block = receipt.blockNumber || '?';
-      log("✅ Mint confirmed! Block " + block + " · Gas used: " + gasUsed);
-      return { success: true, hash: tx.hash, block, gasUsed };
+        log("TX sent: " + tx.hash);
+        const receipt = await tx.wait();
+        if (receipt.status === 0) throw new Error("Transaction reverted on-chain");
+
+        const tokenIds = parseMintedTokenIds(receipt, addr);
+        const gasUsed  = receipt.gasUsed?.toString() || '?';
+        const block    = receipt.blockNumber || '?';
+        log("✅ Mint confirmed! Block " + block + " · Gas used: " + gasUsed +
+            (tokenIds.length ? " · tokenIds: " + tokenIds.join(", ") : ""));
+        return { success: true, hash: tx.hash, block, gasUsed, tokenIds };
+      }, log, maxRetries);
 
     } catch(err) {
       if (err.code === 4001) throw new Error("Rejected by user");
@@ -297,4 +406,92 @@ export function createPrivateKeySigner(privateKey, rpcUrl = 'https://ethereum.pu
 export async function getPrivateKeyAddress(privateKey) {
   const signer = createPrivateKeySigner(privateKey);
   return await signer.getAddress();
+}
+
+/* ══════════════════════════════════════
+   MULTI-WALLET MINT
+   Accepts an array of private keys (strings) or signer objects.
+   Executes a mint from each wallet in parallel (Promise.allSettled)
+   and returns one result object per wallet.
+══════════════════════════════════════ */
+export async function mintFromWallets(contractAddr, signers, qty, log, options = {}) {
+  if (!Array.isArray(signers) || signers.length === 0)
+    throw new Error("signers must be a non-empty array of private keys or signers");
+
+  log("Minting from " + signers.length + " wallet(s) in parallel…");
+
+  const settled = await Promise.allSettled(signers.map(async (entry, i) => {
+    let signer, addr;
+    try {
+      signer = typeof entry === "string"
+        ? createPrivateKeySigner(entry, options.rpcUrl)
+        : entry;
+      addr = await signer.getAddress();
+    } catch (e) {
+      return { index: i, wallet: null, success: false, error: "Invalid wallet: " + e.message };
+    }
+
+    const tag  = "[wallet " + (i + 1) + " " + addr.slice(0, 6) + "…" + addr.slice(-4) + "] ";
+    const wlog = (m, lvl) => log(tag + m, lvl);
+
+    try {
+      const result = await executeMint(contractAddr, signer, qty, wlog, options);
+      return { index: i, wallet: addr, ...result };
+    } catch (e) {
+      return { index: i, wallet: addr, success: false, error: e.message };
+    }
+  }));
+
+  const results = settled.map((s, i) => s.status === "fulfilled"
+    ? s.value
+    : { index: i, wallet: null, success: false, error: s.reason?.message || String(s.reason) });
+
+  const ok = results.filter(r => r.success).length;
+  log("Multi-wallet complete: " + ok + "/" + results.length + " succeeded");
+  return results;
+}
+
+/* ══════════════════════════════════════
+   BATCH MINT
+   Splits totalQty into sequential txs of perTxQty each, with a
+   configurable delay (options.delayMs, default 1000) between txs.
+   Returns one result object per batch tx.
+══════════════════════════════════════ */
+export async function batchMint(contractAddr, signer, totalQty, perTxQty, log, options = {}) {
+  const { delayMs = 1000 } = options;
+  if (totalQty <= 0 || perTxQty <= 0)
+    throw new Error("totalQty and perTxQty must be positive numbers");
+
+  const txCount = Math.ceil(totalQty / perTxQty);
+  log("Batch mint: " + totalQty + " total across " + txCount + " tx (" +
+      perTxQty + "/tx · " + delayMs + "ms delay)");
+
+  const results = [];
+  let remaining = totalQty;
+
+  for (let i = 0; i < txCount; i++) {
+    const thisQty = Math.min(perTxQty, remaining);
+    remaining -= thisQty;
+    log("Batch " + (i + 1) + "/" + txCount + " — minting " + thisQty);
+
+    try {
+      const result = await executeMint(contractAddr, signer, thisQty, log, options);
+      results.push({ batch: i + 1, qty: thisQty, ...result });
+    } catch (e) {
+      results.push({ batch: i + 1, qty: thisQty, success: false, error: e.message });
+      if (isUserRejection(e)) {
+        log("User rejected — stopping batch", "warn");
+        break;
+      }
+    }
+
+    if (i < txCount - 1 && delayMs > 0) {
+      log("Waiting " + delayMs + "ms before next tx…");
+      await sleep(delayMs);
+    }
+  }
+
+  const ok = results.filter(r => r.success).length;
+  log("Batch complete: " + ok + "/" + results.length + " tx succeeded");
+  return results;
 }

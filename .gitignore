@@ -1,0 +1,7 @@
+# Local secrets / env (keep .env.example committed)
+.env
+
+# config.js is committed so the static GitHub Pages deploy can load it
+# (scripts/write-config.mjs can still regenerate it locally for custom RPC/gas).
+
+node_modules/
