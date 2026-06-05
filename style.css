@@ -585,4 +585,141 @@ body{
   .wallet-list-addr{max-width:60%;}
   .contract-inspector .ci-v{max-width:55%;}
   .mint-log{font-size:9.5px;max-height:160px;}
+  .bot-grid{grid-template-columns:1fr;}
+  .bot-row{grid-template-columns:1fr;}
+  .inspect-grid{grid-template-columns:1fr;}
+  .result-stats{grid-template-columns:1fr 1fr;}
 }
+
+/* ════════════════════════════════════════════════════════════════
+   BOT CONSOLE PANEL  (#botPanel)
+   Added during integration: index.html used .bot-* / .inspect-* /
+   .result-* / .turbo-track class names that style.css never defined,
+   so this whole section rendered unstyled. These rules match the real
+   markup and reuse the existing design tokens.
+   ════════════════════════════════════════════════════════════════ */
+.bot-panel{
+  margin-top:20px;
+  background:var(--card);border:1px solid var(--b1);
+  border-radius:var(--r);padding:18px;
+}
+.bot-panel-title{
+  font-family:var(--fd);font-size:13px;font-weight:800;letter-spacing:.04em;
+  color:var(--t0);margin-bottom:14px;
+}
+.bot-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.bot-section{
+  background:var(--card2);border:1px solid var(--b0);
+  border-radius:var(--r);padding:14px;display:flex;flex-direction:column;
+}
+.bot-section-wide{grid-column:1/-1;margin-top:14px;}
+.bot-section-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;
+}
+.bot-section-title{
+  font-size:9px;font-weight:700;color:var(--t2);letter-spacing:.1em;text-transform:uppercase;
+}
+.bot-pill{
+  font-size:9px;font-weight:600;color:var(--acc);
+  background:var(--acc-glow);border:1px solid var(--b0);
+  padding:2px 8px;border-radius:20px;letter-spacing:.04em;
+}
+.bot-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.bot-field{display:flex;flex-direction:column;}
+.bot-field label{
+  font-size:9px;font-weight:600;color:var(--t2);letter-spacing:.08em;
+  text-transform:uppercase;margin-bottom:4px;
+}
+.bot-field input{
+  width:100%;background:var(--card);border:1px solid var(--b1);color:var(--t0);
+  padding:8px 10px;font-family:var(--fi);font-size:12px;border-radius:var(--r-sm);outline:none;
+}
+.bot-field input:focus{border-color:var(--acc);}
+.bot-field input::placeholder{color:var(--t2);}
+
+/* Multi-wallet textarea (markup uses <textarea class="wallet-list">) */
+textarea.wallet-list{
+  display:block;width:100%;min-height:84px;resize:vertical;
+  background:var(--card);border:1px solid var(--b1);color:var(--t0);
+  padding:10px;font-family:"Inter",monospace;font-size:11px;line-height:1.6;
+  border-radius:var(--r-sm);outline:none;margin:10px 0;
+}
+textarea.wallet-list:focus{border-color:var(--acc);}
+textarea.wallet-list::placeholder{color:var(--t2);}
+
+/* Bot buttons */
+.bot-btn{
+  width:100%;padding:9px 12px;
+  background:var(--card);border:1px solid var(--b1);color:var(--t0);
+  font-family:var(--fi);font-size:11px;font-weight:600;letter-spacing:.03em;
+  border-radius:var(--r-sm);cursor:pointer;
+  transition:border-color .2s,background-color .2s,color .2s,filter .2s;
+}
+.bot-btn:hover:not(:disabled){border-color:var(--acc);color:var(--acc);}
+.bot-btn:disabled{opacity:.45;cursor:not-allowed;}
+.bot-btn.primary{background:linear-gradient(90deg,var(--acc),var(--acc2));border-color:transparent;color:#fff;}
+.bot-btn.primary:hover:not(:disabled){filter:brightness(1.08);color:#fff;}
+.bot-btn.danger{border-color:rgba(220,38,38,.3);color:var(--err);}
+.bot-btn.danger:hover:not(:disabled){border-color:var(--err);background:rgba(220,38,38,.08);color:var(--err);}
+.bot-btn-row{display:flex;gap:8px;margin-top:auto;}
+.bot-btn-row .bot-btn{flex:1;}
+
+/* Turbo toggle — overrides the legacy single-element switch.
+   Real markup: <label.turbo-toggle><input><span.turbo-track><span.turbo-thumb></span><span.turbo-text> */
+.turbo-toggle{
+  position:static;width:auto;height:auto;
+  display:flex;align-items:center;gap:10px;
+  background:transparent;border:none;border-radius:0;cursor:pointer;margin-top:4px;
+}
+.turbo-toggle::after{content:none;display:none;}
+.turbo-toggle input{position:absolute;opacity:0;width:0;height:0;}
+.turbo-track{
+  position:relative;flex-shrink:0;width:42px;height:22px;
+  background:var(--card);border:1px solid var(--b1);border-radius:20px;
+  transition:background-color .25s,border-color .25s;
+}
+.turbo-thumb{
+  position:absolute;top:2px;left:2px;width:16px;height:16px;
+  background:var(--t2);border-radius:50%;
+  transition:transform .25s cubic-bezier(.4,1.4,.6,1),background-color .25s;
+}
+.turbo-toggle input:checked + .turbo-track{background:var(--acc-glow);border-color:var(--acc);}
+.turbo-toggle input:checked + .turbo-track .turbo-thumb{
+  transform:translateX(20px);background:var(--acc);box-shadow:0 0 8px rgba(124,47,212,.5);
+}
+.turbo-text{font-size:11px;font-weight:600;color:var(--t0);}
+.turbo-hint{font-weight:400;color:var(--t2);}
+
+/* Contract inspector */
+.inspect-row{display:flex;gap:8px;align-items:center;}
+.inspect-row .bot-btn{width:auto;flex-shrink:0;padding-inline:16px;}
+.inspect-input{
+  flex:1;background:var(--card);border:1px solid var(--b1);color:var(--t0);
+  padding:8px 10px;font-family:"Inter",monospace;font-size:11px;
+  border-radius:var(--r-sm);outline:none;
+}
+.inspect-input:focus{border-color:var(--acc);}
+.inspect-input::placeholder{color:var(--t2);}
+.inspect-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
+.inspect-item{
+  display:flex;flex-direction:column;gap:2px;
+  padding:8px 10px;background:var(--card);border:1px solid var(--b0);border-radius:var(--r-sm);
+}
+.ik{font-size:8px;font-weight:600;color:var(--t2);letter-spacing:.06em;text-transform:uppercase;}
+.iv{font-family:"Inter",monospace;font-size:12px;font-weight:600;color:var(--t0);word-break:break-word;}
+
+/* Result summary */
+.result-card{
+  margin-top:14px;padding:14px 16px;
+  background:var(--card2);border:1px solid var(--b1);border-radius:var(--r);
+}
+.result-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
+.result-stat{
+  display:flex;flex-direction:column;gap:3px;align-items:center;
+  padding:10px;background:var(--card);border:1px solid var(--b0);border-radius:var(--r-sm);
+}
+.result-stat .rs-v{font-family:"Inter",monospace;font-size:18px;font-weight:700;color:var(--t0);}
+.result-stat .rs-l{font-size:8px;font-weight:600;color:var(--t2);letter-spacing:.06em;text-transform:uppercase;}
+.result-stat.ok .rs-v{color:var(--ok);}
+.result-stat.err .rs-v{color:var(--err);}
+.result-list{margin-top:12px;display:flex;flex-direction:column;gap:6px;}
