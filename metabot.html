@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<!-- Always revalidate the page so a new deploy shows up without a manual hard-refresh -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>METABOT</title>
+<script>
+(function(){
+  const cdns=[
+    'https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js',
+    'https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js'
+  ];
+  let i=0;
+  function load(){
+    if(i>=cdns.length)return;
+    const s=document.createElement('script');
+    s.src=cdns[i++];s.onerror=load;
+    document.head.appendChild(s);
+  }
+  load();
+})();
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20260605"/>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="dot"></div>
+    <span class="wm">METABOT</span>
+  </div>
+  <div class="tb-r">
+    <div class="tb-stat"><span class="tb-l">ETH</span><span class="tb-v" id="ethP">$—</span></div>
+    <div class="tb-stat"><span class="tb-l">GWEI</span><span class="tb-v" id="gasP">—</span></div>
+    <button class="wb" id="walletBtn" onclick="connectWallet()">Connect Wallet</button>
+    <button class="wb wb-disconnect" id="disconnectBtn" onclick="disconnectWallet()" hidden>Disconnect</button>
+    <button class="wb wb-pk" onclick="togglePKSection()" title="Use private key wallet">🔑</button>
+  </div>
+</div>
+
+<!-- PRIVATE KEY SECTION -->
+<div id="pkSection" style="display:none;background:var(--card);border-bottom:1px solid var(--b0);padding:10px 24px;">
+  <div style="max-width:600px;margin:0 auto;display:flex;gap:8px;align-items:center;">
+    <div style="flex:1;">
+      <input type="password" id="pkInput" placeholder="Private key (0x…) — cleared immediately after loading"
+        style="width:100%;background:var(--card2);border:1px solid rgba(220,38,38,.3);color:var(--t0);
+        padding:8px 12px;font-family:var(--fm,monospace);font-size:12px;border-radius:6px;outline:none;"/>
+    </div>
+    <button onclick="connectPrivateKey()"
+      style="padding:8px 16px;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.3);
+      color:#ef4444;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">
+      Load Key
+    </button>
+    <div style="font-size:9px;color:var(--t2);max-width:160px;line-height:1.4;">
+      ⚠️ Use a dedicated hot wallet only. Never use your main wallet's key.
+    </div>
+  </div>
+</div>
+
+<!-- PAGE -->
+<div class="page">
+
+  <!-- URL BAR — full width -->
+  <div class="url-bar">
+    <input type="text" id="urlIn" class="url-in" placeholder="Paste any ETH mint link or 0x contract address…"/>
+    <button class="url-btn" id="fetchBtn">Fetch</button>
+  </div>
+  <p class="url-hint">
+    <span class="primary">opensea.io collection URL</span> · <span>0x contract</span> · <span>zora.co</span> · <span>mint.fun</span>
+  </p>
+  <div class="status-msg" id="statusMsg"></div>
+
+  <!-- TWO COLUMN GRID -->
+  <div class="page-grid">
+
+    <!-- LEFT: collection info, queue, log -->
+    <div class="col-main">
+
+      <!-- COLLECTION CARD -->
+      <div class="col-card" id="colCard">
+        <div class="col-banner" id="colBanner">
+          <img id="colBannerImg" src="" alt="" style="display:none;"/>
+          <div class="col-banner-overlay">
+            <div id="colThumbWrap"></div>
+            <div class="col-info">
+              <div class="col-name" id="colName">—</div>
+              <a class="col-addr" id="colAddr" href="#" target="_blank" rel="noopener">
+                <span id="colAddrText">—</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="col-body">
+          <div class="progress-row">
+            <span class="progress-label" id="progressLabel">0% minted</span>
+            <span class="progress-val" id="progressVal">0 / —</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+          <div class="col-stats-row">
+            <div class="col-links" id="colLinks"></div>
+            <span class="floor-pill" id="colFloor" style="display:none;"></span>
+          </div>
+          <div class="phases-title">Mint Phases</div>
+          <div id="phaseList"></div>
+        </div>
+      </div>
+
+      <!-- TASK QUEUE -->
+      <div class="queue-section" id="queueSection">
+        <div class="queue-header">
+          <span class="queue-title">Task Queue</span>
+          <span class="queue-cnt" id="queueCnt">0 tasks</span>
+        </div>
+        <div id="taskList"></div>
+      </div>
+
+      <!-- LOG -->
+      <div class="log-section">
+        <div class="log" id="botLog">
+          <div class="le info"><span class="ts">[--:--]</span>METABOT ready — paste a mint link above to begin.</div>
+        </div>
+      </div>
+
+    </div><!-- /col-main -->
+
+    <!-- RIGHT: configure mint + action buttons (sticky) -->
+    <div class="col-side">
+
+      <!-- CONFIGURE MINT -->
+      <div class="mint-config" id="mintConfig">
+        <div class="mc-title">Configure Mint</div>
+        <div class="mc-row">
+          <div class="mc-field" style="grid-column:1/-1;">
+            <label>Wallet Address</label>
+            <input type="text" id="mAddr" placeholder="0x… (auto-filled on connect)"/>
+          </div>
+        </div>
+        <div class="mc-row">
+          <div class="mc-field">
+            <label>Mint Price (ETH)</label>
+            <input type="number" id="mPrc" placeholder="auto-detected" step="0.0001" min="0"
+              oninput="COL.price = parseFloat(this.value) || 0"/>
+          </div>
+          <div class="mc-field">
+            <label>Quantity</label>
+            <input type="number" id="mQty" value="1" min="1"/>
+          </div>
+        </div>
+        <div class="mc-row">
+          <div class="mc-field">
+            <label>Max Gas (gwei)</label>
+            <input type="number" id="mGas" value="50"/>
+          </div>
+          <div class="mc-field">
+            <label>Priority Tip (gwei)</label>
+            <input type="number" id="mTip" value="2" step="0.1"/>
+          </div>
+        </div>
+        <div>
+          <div class="mc-mode-lbl">Bot Mode</div>
+          <div class="mode-tabs" id="modeBar">
+            <button class="mode-tab on" data-mode="manual">MANUAL</button>
+            <button class="mode-tab" data-mode="scheduled">SCHEDULE</button>
+            <button class="mode-tab" data-mode="sniper">SNIPER</button>
+          </div>
+          <div class="mode-note" id="modeNote">Opens wallet immediately — you sign to mint</div>
+        </div>
+        <div class="sched-row" id="schedRow" style="display:none;">
+          <label>Mint Time (Local)</label>
+          <input type="datetime-local" id="mTime"/>
+        </div>
+      </div>
+
+      <!-- MINT BUTTON -->
+      <button class="mint-btn" id="mintBtn">⚡ Mint Now</button>
+      <button class="queue-btn" id="queueBtn">+ Add to Task Queue</button>
+      <div class="limit-note" id="limitNote">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="limitText">—</span>
+      </div>
+
+    </div><!-- /col-side -->
+
+  </div><!-- /page-grid -->
+
+  <!-- ══════════════════════════════════════════════════════════════
+       BOT PANEL — expanded mint bot controls
+       All new bot UI lives inside #botPanel. IDs/classes below form the
+       contract shared with app.js (logic) and style.css (styling).
+
+       Multi-wallet   : #walletsSection #walletList #walletCount #loadWalletsBtn
+       Batch mint      : #batchSection #batchQty #batchDelay #batchMintBtn #batchStopBtn
+       Gas controls    : #gasSection #gasMax #gasTip #turboToggle
+       Mint log        : #mintLogSection #mintLog
+       Result summary  : #resultSummary (hidden) #resultSuccess #resultFailed #resultTotal #resultList
+       Contract inspect: #contractInspector #inspectAddr #inspectBtn #inspectResult
+                         #inspectName #inspectSymbol #inspectSupply #inspectMaxSupply
+                         #inspectPrice #inspectMintFn
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="bot-panel" id="botPanel">
+    <div class="bot-panel-title">Bot Console</div>
+    <div class="bot-grid">
+
+      <!-- MULTI-WALLET -->
+      <section class="bot-section" id="walletsSection">
+        <div class="bot-section-head">
+          <span class="bot-section-title">Wallets</span>
+          <span class="bot-pill" id="walletCount">0 wallets</span>
+        </div>
+        <textarea id="walletList" class="wallet-list"
+          placeholder="One wallet per line — private key (0x…) or address (0x…)"
+          spellcheck="false" autocomplete="off"></textarea>
+        <button class="bot-btn" id="loadWalletsBtn">Load Wallets</button>
+      </section>
+
+      <!-- BATCH MINT CONTROLS -->
+      <section class="bot-section" id="batchSection">
+        <div class="bot-section-head">
+          <span class="bot-section-title">Batch Mint</span>
+        </div>
+        <div class="bot-row">
+          <div class="bot-field">
+            <label for="batchQty">Qty / Wallet</label>
+            <input type="number" id="batchQty" value="1" min="1"/>
+          </div>
+          <div class="bot-field">
+            <label for="batchDelay">Delay (ms)</label>
+            <input type="number" id="batchDelay" value="0" min="0" step="100"/>
+          </div>
+        </div>
+        <div class="bot-btn-row">
+          <button class="bot-btn primary" id="batchMintBtn">⚡ Mint All Wallets</button>
+          <button class="bot-btn danger" id="batchStopBtn" disabled>Stop</button>
+        </div>
+      </section>
+
+      <!-- GAS CONTROLS + TURBO -->
+      <section class="bot-section" id="gasSection">
+        <div class="bot-section-head">
+          <span class="bot-section-title">Gas Controls</span>
+        </div>
+        <div class="bot-row">
+          <div class="bot-field">
+            <label for="gasMax">Max Gas (gwei)</label>
+            <input type="number" id="gasMax" placeholder="auto" min="0"/>
+          </div>
+          <div class="bot-field">
+            <label for="gasTip">Priority Tip (gwei)</label>
+            <input type="number" id="gasTip" placeholder="auto" min="0" step="0.1"/>
+          </div>
+        </div>
+        <label class="turbo-toggle" for="turboToggle">
+          <input type="checkbox" id="turboToggle"/>
+          <span class="turbo-track"><span class="turbo-thumb"></span></span>
+          <span class="turbo-text">Turbo Mode <span class="turbo-hint">— aggressive gas, parallel sends</span></span>
+        </label>
+      </section>
+
+      <!-- CONTRACT INSPECTOR -->
+      <section class="bot-section" id="contractInspector">
+        <div class="bot-section-head">
+          <span class="bot-section-title">Contract Inspector</span>
+        </div>
+        <div class="bot-row inspect-row">
+          <input type="text" id="inspectAddr" class="inspect-input"
+            placeholder="0x contract address…" spellcheck="false" autocomplete="off"/>
+          <button class="bot-btn" id="inspectBtn">Inspect</button>
+        </div>
+        <div class="inspect-grid" id="inspectResult" hidden>
+          <div class="inspect-item"><span class="ik">Name</span><span class="iv" id="inspectName">—</span></div>
+          <div class="inspect-item"><span class="ik">Symbol</span><span class="iv" id="inspectSymbol">—</span></div>
+          <div class="inspect-item"><span class="ik">Total Supply</span><span class="iv" id="inspectSupply">—</span></div>
+          <div class="inspect-item"><span class="ik">Max Supply</span><span class="iv" id="inspectMaxSupply">—</span></div>
+          <div class="inspect-item"><span class="ik">Mint Price</span><span class="iv" id="inspectPrice">—</span></div>
+          <div class="inspect-item"><span class="ik">Mint Fn</span><span class="iv" id="inspectMintFn">—</span></div>
+        </div>
+      </section>
+
+    </div><!-- /bot-grid -->
+
+    <!-- MINT LOG -->
+    <section class="bot-section bot-section-wide" id="mintLogSection">
+      <div class="bot-section-head">
+        <span class="bot-section-title">Mint Log</span>
+      </div>
+      <div class="mint-log" id="mintLog"></div>
+    </section>
+
+    <!-- RESULT SUMMARY (hidden by default) -->
+    <div class="result-card" id="resultSummary" hidden>
+      <div class="bot-section-head">
+        <span class="bot-section-title">Mint Results</span>
+      </div>
+      <div class="result-stats">
+        <div class="result-stat ok"><span class="rs-v" id="resultSuccess">0</span><span class="rs-l">Success</span></div>
+        <div class="result-stat err"><span class="rs-v" id="resultFailed">0</span><span class="rs-l">Failed</span></div>
+        <div class="result-stat"><span class="rs-v" id="resultTotal">0</span><span class="rs-l">Total</span></div>
+      </div>
+      <div class="result-list" id="resultList"></div>
+    </div>
+
+  </div><!-- /botPanel -->
+
+</div><!-- /page -->
+
+<!-- WALLET MODAL -->
+<div class="ov" id="overlay">
+  <div class="modal">
+    <button class="mcls" id="modalClose">✕</button>
+    <h2>⚡ Ready to Mint</h2>
+    <p id="modalDesc">Review the transaction and sign with your wallet.</p>
+    <div class="txbox" id="txPreview"></div>
+    <div class="modal-btns">
+      <button class="btn-mm" id="btnMM" onclick="signWithMM()">Sign with MetaMask</button>
+      <a class="btn-dl" id="btnRainbow" href="#" target="_blank" rel="noopener">Open in Rainbow</a>
+      <a class="btn-dl" id="btnTrust" href="#" target="_blank" rel="noopener">Open in Trust Wallet</a>
+    </div>
+    <div class="mfoot">Calldata is pre-built. Review in your wallet before signing.</div>
+  </div>
+</div>
+
+<!-- THEME TOGGLE -->
+<button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle dark/light mode">
+  <span id="themeIcon">○</span>
+</button>
+
+<!-- Runtime config (generated by scripts/write-config.mjs → window.METABOT_CONFIG) -->
+<script src="config.js?v=20260605"></script>
+<script type="module" src="app.js?v=20260605"></script>
+</body>
+</html>
