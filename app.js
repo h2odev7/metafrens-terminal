@@ -12,7 +12,7 @@ const OPENSEA_HEADERS = { 'Accept': 'application/json', 'x-api-key': OPENSEA_API
 import {
   executeMint, detectPrice, createPrivateKeySigner, getPrivateKeyAddress,
   fetchABI, findMintFunctions
-} from './mintEngine.js';
+} from './mintEngine.js?v=20260605';
 // NOTE: mintEngine.js does not export batchMint(); per the "treat as import / do not
 // modify" constraint, the batch loop below is orchestrated in app.js on top of the
 // real executeMint() export (one signed tx per call).
