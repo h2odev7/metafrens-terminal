@@ -88,6 +88,37 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .add-row{display:flex;gap:6px;margin-top:8px;}
 .add-inp{flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 9px;font-family:var(--font-b);font-size:11.5px;border-radius:var(--radius-sm);outline:none;}
 .add-inp:focus{border-color:var(--accent);}
+/* ── Tracked Account → Project Affinity ── */
+.tr-item{border-bottom:1px solid var(--border);}
+.tr-item:last-child{border-bottom:none;}
+.tr-row{cursor:pointer;border-bottom:none;transition:color .15s;}
+.tr-row:hover,.tr-row.open{color:var(--accent2);}
+.tr-row:hover .tr-h{color:var(--accent2);}
+.tr-end{display:flex;align-items:center;gap:6px;}
+.tr-aff-cnt{font-size:8.5px;font-weight:700;color:var(--accent);background:rgba(168,85,247,.14);border:1px solid rgba(168,85,247,.3);border-radius:9px;padding:1px 6px;}
+.tr-aff{padding:2px 0 8px;animation:affIn .18s ease;}
+@keyframes affIn{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:none;}}
+.aff-head{font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:2px 0 6px;}
+.aff-row{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 8px;margin-bottom:5px;}
+.aff-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;}
+.aff-name{font-size:11px;font-weight:600;color:var(--text);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.aff-src{font-size:7.5px;font-weight:700;letter-spacing:.04em;padding:1px 5px;border-radius:4px;white-space:nowrap;flex-shrink:0;}
+.sb-handle{background:rgba(16,217,122,.14);color:var(--green);border:1px solid rgba(16,217,122,.35);}
+.sb-name{background:rgba(79,142,247,.14);color:var(--blue);border:1px solid rgba(79,142,247,.35);}
+.sb-fuzzy{background:rgba(245,200,66,.14);color:var(--yellow);border:1px solid rgba(245,200,66,.35);}
+.aff-bot{display:flex;align-items:center;gap:9px;}
+.aff-stat{font-size:9px;color:var(--text3);white-space:nowrap;}
+.aff-stat b{color:var(--text);font-weight:600;}
+.aff-snipe{margin-left:auto;padding:3px 9px!important;font-size:9.5px!important;}
+.aff-empty{font-size:9.5px;color:var(--text3);padding:7px 8px;background:var(--surface2);border:1px dashed var(--border2);border-radius:var(--radius-sm);}
+.aff-empty b{color:var(--accent2);}
+.aff-empty span{display:block;margin-top:3px;font-size:8.5px;opacity:.8;line-height:1.4;}
+/* "N frens" badge on collection cards */
+.frens-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;color:var(--accent2);background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);border-radius:10px;padding:2px 8px;margin-bottom:7px;cursor:pointer;transition:all .15s;}
+.frens-badge:hover{background:rgba(168,85,247,.22);border-color:var(--accent);}
+/* highlight pulse on linked accounts when a frens badge is clicked */
+.tr-item.fren-hl{background:rgba(168,85,247,.12);border-radius:var(--radius-sm);box-shadow:inset 0 0 0 1px rgba(168,85,247,.45);animation:frenPulse 1s ease;}
+@keyframes frenPulse{0%{background:rgba(168,85,247,.4);}100%{background:rgba(168,85,247,.12);}}
 
 .mkt-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 11px;margin-bottom:6px;}
 .mkt-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;}
@@ -1182,6 +1213,7 @@ function renderCols(){
   if(!list.length){$('cGrid').innerHTML='<div class="empty" style="grid-column:1/-1"><b>No results.</b>Try refreshing or change filters.</div>';return;}
   $('cGrid').innerHTML=list.map(c=>{
     const tc=c.tag==='TRENDING'||c.tag==='HOT'||c.tag==='PUMPING'?'hot':c.tag==='NEW'||c.tag==='FREE'?'new':c.tag==='SOON'?'soon':'';
+    const frens=collFrens(c);
     const sv=STATE.saved.some(s=>s.name===c.name);
     const chg=c.change||0;const chgS=(chg>=0?'+':'')+chg.toFixed(1)+'%';
     const chgC=chg>=0?'var(--green)':'var(--red)';
@@ -1194,6 +1226,7 @@ function renderCols(){
       <div class="cbody">
         <div class="cname">${c.name.slice(0,15)}${c.verified?'<span class="vmark">&#10003;</span>':''}${chainBadge}</div>
         <div class="chandle">${(c.handle||'').slice(0,18)}</div>
+        ${frens.length?`<div class="frens-badge" data-frens="${frens.map(f=>f.toLowerCase()).join(',')}" title="${frens.map(f=>'@'+f).join(', ')} — click to highlight">&#128101; ${frens.length} fren${frens.length>1?'s':''}</div>`:''}
         <div class="cstats">
           <div><span class="csl">Floor</span><span class="csv">${fmtP(c.price,chain,c.launched)}</span></div>
           <div><span class="csl">24h Vol</span><span class="csv">${fmtV(c.vol24||0,chain)}</span></div>
@@ -1225,11 +1258,97 @@ function renderCols(){
     document.querySelector('[data-tab="bot"]').click();$('mPrc').value=c.price;$('cAddr').focus();
     log(`Pre-filling snipe for ${c.name}`,'info');
   }));
+  $('cGrid').querySelectorAll('.frens-badge').forEach(b=>b.addEventListener('click',e=>{
+    e.stopPropagation();
+    highlightFrens((b.dataset.frens||'').split(',').filter(Boolean));
+  }));
 }
+
+/* ════════════════════════════════════════════════════════════
+   TRACKED ACCOUNT → PROJECT AFFINITY  (real handle/name matching)
+   3 ranked signal sources by confidence — no fabricated data,
+   all derived from STATE.collections:
+     HANDLE — account handle == collection's project handle  (~95%)
+     NAME   — account base (digits stripped) matches name/slug (62-80%)
+     FUZZY  — account substring of name/slug, or handle overlap (~40%)
+   ════════════════════════════════════════════════════════════ */
+function _normH(h){return (h||'').toLowerCase().replace(/^@/,'').replace(/[^a-z0-9]/g,'');}
+function _normN(n){return (n||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function acctCollMatch(handle,c){
+  const a=_normH(handle); if(!a)return null;
+  const aBase=a.replace(/[0-9]+$/,'');
+  const ch=_normH(c.handle), cn=_normN(c.name), cs=_normN(c.slug);
+  if(ch&&a===ch)                                   return {src:'HANDLE',conf:.95};
+  if(aBase.length>=4){
+    if(cn===aBase||cs===aBase)                     return {src:'NAME',conf:.80};
+    if((cn.length>=4&&(cn.includes(aBase)||aBase.includes(cn)))||
+       (cs.length>=4&&(cs.includes(aBase)||aBase.includes(cs))))
+                                                   return {src:'NAME',conf:.62};
+  }
+  if(a.length>=5&&(cn.includes(a)||cs.includes(a)||(ch&&(ch.includes(a)||a.includes(ch)))))
+                                                   return {src:'FUZZY',conf:.40};
+  return null;
+}
+function acctLinks(handle){
+  return STATE.collections.map(c=>{const m=acctCollMatch(handle,c);return m?Object.assign({c},m):null;})
+    .filter(Boolean).sort((x,y)=>y.conf-x.conf);
+}
+function collFrens(c){return STATE.tracked.filter(h=>acctCollMatch(h,c));}
 
 function renderTracked(){
   $('trcCnt').textContent=STATE.tracked.length;
-  $('trcList').innerHTML=STATE.tracked.map((h,i)=>`<div class="tr-row"><span class="tr-h">@${h}</span><button class="ibt" onclick="remTrc(${i})">×</button></div>`).join('');
+  $('trcList').innerHTML=STATE.tracked.map((h,i)=>{
+    const n=acctLinks(h).length;
+    return `<div class="tr-item" data-handle="${h.toLowerCase()}">
+      <div class="tr-row" onclick="toggleAff(${i})" title="Show projects @${h} is linked to">
+        <span class="tr-h">@${h}</span>
+        <span class="tr-end">${n?`<span class="tr-aff-cnt" title="${n} linked project${n>1?'s':''}">${n}</span>`:''}<button class="ibt" onclick="event.stopPropagation();remTrc(${i})" title="Remove">×</button></span>
+      </div>
+      <div class="tr-aff" id="aff${i}" hidden></div>
+    </div>`;
+  }).join('');
+}
+function toggleAff(i){
+  const el=$('aff'+i); if(!el)return;
+  const wasOpen=!el.hasAttribute('hidden');
+  document.querySelectorAll('#trcList .tr-aff').forEach(a=>a.setAttribute('hidden',''));
+  document.querySelectorAll('#trcList .tr-row').forEach(r=>r.classList.remove('open'));
+  if(wasOpen)return;
+  const h=STATE.tracked[i], links=acctLinks(h);
+  el.innerHTML = links.length
+    ? `<div class="aff-head">${links.length} linked project${links.length>1?'s':''} · ranked by confidence</div>`+links.map(l=>`
+        <div class="aff-row">
+          <div class="aff-top">
+            <span class="aff-name">${l.c.name.slice(0,20)}</span>
+            <span class="aff-src sb-${l.src.toLowerCase()}">${l.src} ${Math.round(l.conf*100)}%</span>
+          </div>
+          <div class="aff-bot">
+            <span class="aff-stat">Floor <b>${fmtP(l.c.price,l.c.chain,l.c.launched)}</b></span>
+            <span class="aff-stat">Vol <b>${fmtV(l.c.vol24||0,l.c.chain)}</b></span>
+            <button class="btn btn-primary btn-sm aff-snipe" data-action="snipe" data-name="${l.c.name}">Snipe &rarr;</button>
+          </div>
+        </div>`).join('')
+    : `<div class="aff-empty">No on-chain project links for <b>@${h}</b> in the current live set.<span>Affinity = real handle/name matches against loaded collections — refresh to widen the set.</span></div>`;
+  el.removeAttribute('hidden');
+  el.previousElementSibling.classList.add('open');
+  el.querySelectorAll('[data-action="snipe"]').forEach(b=>b.addEventListener('click',e=>{
+    e.stopPropagation();
+    const c=STATE.collections.find(x=>x.name===b.dataset.name); if(!c)return;
+    document.querySelector('[data-tab="bot"]').click();$('mPrc').value=c.price;$('cAddr').focus();
+    log(`Pre-filling snipe for ${c.name}`,'info');
+  }));
+}
+function highlightFrens(handles){
+  const set=new Set((handles||[]).map(h=>h.toLowerCase()));
+  let first=null;
+  document.querySelectorAll('#trcList .tr-item').forEach(it=>{
+    const on=set.has((it.dataset.handle||'').toLowerCase());
+    it.classList.toggle('fren-hl',on);
+    if(on&&!first)first=it;
+  });
+  if(first)first.scrollIntoView({behavior:'smooth',block:'center'});
+  clearTimeout(window._frenHlT);
+  window._frenHlT=setTimeout(()=>document.querySelectorAll('#trcList .tr-item.fren-hl').forEach(it=>it.classList.remove('fren-hl')),3500);
 }
 function remTrc(i){STATE.tracked.splice(i,1);renderTracked();loadTwEmbeds();}
 $('addH').addEventListener('click',()=>{
