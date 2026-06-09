@@ -1,2 +1,2 @@
-# metafrens-terminal
-MetaBot
+# Alpha-terminal
+Bot
