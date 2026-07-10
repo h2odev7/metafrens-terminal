@@ -7,6 +7,7 @@
 
 ## Telegram control server
 - `npm run control`
+- The control server binds to `127.0.0.1` only by default and is intended for local use. Do not expose it publicly without adding your own authentication and rate limiting.
 - Optional `.env` values:
   - `TELEGRAM_BOT_TOKEN`
   - `TELEGRAM_ALLOWED_CHAT_IDS`

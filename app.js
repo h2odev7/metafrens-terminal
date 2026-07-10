@@ -47,13 +47,21 @@ function formatMintDisplay({ price = COL.price, state = COL.mintPriceState, reas
   if (typeof price === 'number' && price > 0) {
     return formatNativeUsd(price, { symbol, usdRate });
   }
-  return reason ? 'UNKNOWN · ' + reason : 'UNKNOWN';
+  return reason ? 'Unknown · ' + reason : 'Unknown';
 }
 
 function formatFloorDisplay(floor = COL.floor) {
   return typeof floor === 'number' && floor > 0
     ? formatNativeUsd(floor, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null })
     : 'unknown';
+}
+
+function formatTaskPriceDisplay(price) {
+  if (price === 0) return 'FREE';
+  if (typeof price === 'number' && price > 0) {
+    return formatNativeUsd(price, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null });
+  }
+  return 'Unknown';
 }
 
 async function syncControlBridge() {
@@ -726,7 +734,7 @@ function renderPhases(phases, supply, minted, detectedPrice) {
         '<span class="phase-timer ' + timerClass + '">' + timerText + '</span>' +
       '</div>' +
       '<div class="phase-meta">' +
-        '<span class="phase-pill eth">PRICE · ' + (price === 0 ? 'FREE' : (price > 0 ? formatNativeUsd(price, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : 'UNKNOWN')) + '</span>' +
+        '<span class="phase-pill eth">PRICE · ' + (price === 0 ? 'FREE' : (price > 0 ? formatNativeUsd(price, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : 'Unknown')) + '</span>' +
         '<span class="phase-pill">SUPPLY · ' + (supply > 0 ? supply.toLocaleString() : '—') + '</span>' +
         (ph.max_per_wallet ? '<span class="phase-pill">MAX ' + ph.max_per_wallet + '/WALLET</span>' : '') +
       '</div>' +
@@ -766,7 +774,7 @@ function renderPhase(price, supply) {
         '<span class="phase-timer live">LIVE</span>' +
       '</div>' +
       '<div class="phase-meta">' +
-        '<span class="phase-pill eth">PRICE · ' + (p === 0 ? 'FREE' : (p > 0 ? formatNativeUsd(p, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : 'UNKNOWN')) + '</span>' +
+        '<span class="phase-pill eth">PRICE · ' + (p === 0 ? 'FREE' : (p > 0 ? formatNativeUsd(p, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : 'Unknown')) + '</span>' +
         '<span class="phase-pill">SUPPLY · ' + (supply > 0 ? supply.toLocaleString() : '—') + '</span>' +
       '</div>' +
     '</div>';
@@ -940,7 +948,7 @@ function renderTasks() {
       '</div>' +
       '<div class="tc-meta">' +
         '<div class="tc-m"><span class="lk">Mode</span><span class="lv">' + t.mode.toUpperCase() + '</span></div>' +
-        '<div class="tc-m"><span class="lk">Price</span><span class="lv">' + (t.price === 0 ? 'FREE' : (t.price > 0 ? formatNativeUsd(t.price, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : 'UNKNOWN')) + '</span></div>' +
+        '<div class="tc-m"><span class="lk">Price</span><span class="lv">' + formatTaskPriceDisplay(t.price) + '</span></div>' +
         '<div class="tc-m"><span class="lk">Gas</span><span class="lv">' + t.options.maxGas + '</span></div>' +
         '<div class="tc-m"><span class="lk">' + (t.mode === 'scheduled' ? 'Fires In' : 'State') + '</span><span class="lv hi">' + (t.time ? fmtCD(t.time) : t.mode === 'sniper' ? 'WATCHING' : 'NOW') + '</span></div>' +
       '</div>' +
@@ -1013,12 +1021,15 @@ function openModal(task) {
   S.pending = task;
   const priceValue = typeof task.price === 'number' ? task.price : null;
   const tot = priceValue > 0 ? priceValue * task.qty : 0;
-  const vW = ethers.utils.parseEther(tot.toFixed(8)).toString();
+  const valueText = priceValue == null
+    ? task.qty + ' x Unknown price = Unknown total'
+    : task.qty + ' x ' + formatTaskPriceDisplay(task.price) + (priceValue > 0 ? ' = ' + formatNativeUsd(tot, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : '');
+  const vW = ethers.utils.parseEther((priceValue == null ? 0 : tot).toFixed(8)).toString();
 
   $('txPreview').innerHTML = [
     ['Collection', task.name || '-'],
     ['Contract', task.contract.slice(0, 14) + '...' + task.contract.slice(-4)],
-    ['Qty / Value', task.qty + ' x ' + (task.price === 0 ? 'FREE' : (task.price > 0 ? formatNativeUsd(task.price, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : 'UNKNOWN')) + (task.price > 0 ? ' = ' + formatNativeUsd(tot, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : '')],
+    ['Qty / Value', valueText],
     ['Gas', task.options.maxGas + ' gwei max - ' + task.options.tip + ' gwei tip'],
   ].map(([k, v]) => '<div class="txr"><span class="txk">' + k + '</span><span class="txv">' + v + '</span></div>').join('');
 

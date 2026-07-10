@@ -1,4 +1,5 @@
 export const DEFAULT_TARGET_MULTIPLE = 2;
+const PRICE_COMPARISON_TOLERANCE = 1e-12;
 
 export const CHAIN_CONFIG = {
   ethereum: {
@@ -286,11 +287,11 @@ export function applyWatchSnapshot(watch, snapshot = {}, now = new Date().toISOS
   next.status = 'armed';
 
   if (!next.currentMultiple || next.currentMultiple < next.targetMultiple) {
-    next.notifiedLevels = next.notifiedLevels.filter(level => next.currentMultiple && level * next.targetMultiple <= next.currentMultiple + 1e-12);
+    next.notifiedLevels = next.notifiedLevels.filter(level => next.currentMultiple && level * next.targetMultiple <= next.currentMultiple + PRICE_COMPARISON_TOLERANCE);
     return { watch: next, alert: null, stateChanged: true };
   }
 
-  const crossedLevel = Math.floor((next.currentMultiple + 1e-12) / next.targetMultiple);
+  const crossedLevel = Math.floor((next.currentMultiple + PRICE_COMPARISON_TOLERANCE) / next.targetMultiple);
   next.notifiedLevels = next.notifiedLevels.filter(level => level <= crossedLevel);
   let alert = null;
   if (crossedLevel > 0 && !next.notifiedLevels.includes(crossedLevel)) {
