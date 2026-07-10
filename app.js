@@ -1011,8 +1011,8 @@ function tickTasks() {
 
 function openModal(task) {
   S.pending = task;
-  const priceValue = task.price > 0 ? task.price : 0;
-  const tot = priceValue * task.qty;
+  const priceValue = typeof task.price === 'number' ? task.price : null;
+  const tot = priceValue > 0 ? priceValue * task.qty : 0;
   const vW = ethers.utils.parseEther(tot.toFixed(8)).toString();
 
   $('txPreview').innerHTML = [

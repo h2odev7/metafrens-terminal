@@ -48,6 +48,7 @@ const PRICE_GETTERS = [
   ['mintCost()', '0xbdb4b848'],
   ['presalePrice()', '0x000e7fa8']
 ];
+const MINT_BASIS_WAIT_MESSAGE = 'Mint price is not verified yet. Use basis=floor or provide price=<native>.';
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -685,7 +686,7 @@ async function createOrRefreshWatch(state, config, chatId, input, options = {}) 
   if (watch.basis === 'mint' && watch.baselineValue == null) {
     return {
       ok: false,
-      text: buildResolutionMessage(input, watch.lastError || 'Mint price is not verified yet. Use basis=floor or provide price=<native>.')
+      text: buildResolutionMessage(input, watch.lastError || MINT_BASIS_WAIT_MESSAGE)
     };
   }
 
