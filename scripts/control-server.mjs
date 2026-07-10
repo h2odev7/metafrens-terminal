@@ -144,7 +144,8 @@ function log(config, message, extra = '') {
 function ageText(isoString) {
   if (!isoString) return 'never';
   const delta = Date.now() - new Date(isoString).getTime();
-  if (!Number.isFinite(delta) || delta < 0) return 'just now';
+  if (!Number.isFinite(delta)) return 'unknown';
+  if (delta < 0) return 'future';
   if (delta < 60000) return `${Math.round(delta / 1000)}s ago`;
   if (delta < 3600000) return `${Math.round(delta / 60000)}m ago`;
   return `${Math.round(delta / 3600000)}h ago`;

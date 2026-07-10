@@ -40,13 +40,14 @@ const COL = {
 
 let _prevEth = 0;
 const CONTROL_SERVER_URL = window.METABOT_CONFIG?.controlServerUrl || '';
+let _bridgeSyncWarned = false;
 
-function formatMintDisplay(price = COL.price) {
-  if (COL.mintPriceState === 'free') return 'FREE';
+function formatMintDisplay({ price = COL.price, state = COL.mintPriceState, reason = COL.mintPriceReason, symbol = COL.nativeSymbol || 'ETH', usdRate = S.ethPrice || null } = {}) {
+  if (state === 'free') return 'FREE';
   if (typeof price === 'number' && price > 0) {
-    return formatNativeUsd(price, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null });
+    return formatNativeUsd(price, { symbol, usdRate });
   }
-  return COL.mintPriceReason ? 'UNKNOWN · ' + COL.mintPriceReason : 'UNKNOWN';
+  return reason ? 'UNKNOWN · ' + reason : 'UNKNOWN';
 }
 
 function formatFloorDisplay(floor = COL.floor) {
@@ -77,7 +78,13 @@ async function syncControlBridge() {
         } : null
       })
     });
-  } catch(e) {}
+    _bridgeSyncWarned = false;
+  } catch(e) {
+    if (!_bridgeSyncWarned) {
+      console.warn('MetaBot control bridge sync failed:', e.message || e);
+      _bridgeSyncWarned = true;
+    }
+  }
 }
 
 async function loadPrices() {
@@ -542,7 +549,7 @@ async function fetchCollection() {
       COL.mintPriceSource = 'drops API';
       COL.mintPriceReason = '';
       if ($('mPrc') && !$('mPrc').value) $('mPrc').value = phasePrice.toFixed(4);
-      log('Mint price: ' + formatMintDisplay(phasePrice) + ' (from drops API)', 'ok');
+      log('Mint price: ' + formatMintDisplay({ price: phasePrice, state: 'known' }) + ' (from drops API)', 'ok');
     } else if (phasesResolved && phasePrice === 0) {
       // Drops API responded — price is 0 = confirmed FREE MINT
       COL.price = 0;
@@ -558,7 +565,7 @@ async function fetchCollection() {
       COL.mintPriceSource = 'on-chain getter';
       COL.mintPriceReason = '';
       if ($('mPrc') && !$('mPrc').value) $('mPrc').value = parseFloat(detectedPrice).toFixed(4);
-      log('Mint price: ' + formatMintDisplay(parseFloat(detectedPrice)) + ' (on-chain detected)', 'ok');
+      log('Mint price: ' + formatMintDisplay({ price: parseFloat(detectedPrice), state: 'known' }) + ' (on-chain detected)', 'ok');
     } else {
       // No verified price found — do not guess or mark FREE
       COL.price = null;
