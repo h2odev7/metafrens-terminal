@@ -13,6 +13,7 @@ import {
   executeMint, detectPrice, createPrivateKeySigner, getPrivateKeyAddress,
   fetchABI, findMintFunctions
 } from './mintEngine.js?v=20260605';
+import { formatNativeUsd } from './controlShared.js';
 // NOTE: mintEngine.js does not export batchMint(); per the "treat as import / do not
 // modify" constraint, the batch loop below is orchestrated in app.js on top of the
 // real executeMint() export (one signed tx per call).
@@ -27,12 +28,55 @@ const S = {
 };
 
 const COL = {
-  contract: null, name: '', price: 0, floor: 0,
+  contract: null, name: '', price: null, floor: null,
   supply: 0, minted: 0, slug: '', platform: '',
-  phases: [], soldOut: false
+  phases: [], soldOut: false,
+  chain: 'ethereum', nativeSymbol: 'ETH',
+  mintPriceState: 'unknown', mintPriceSource: '', mintPriceReason: '',
+  floorSource: '', floorUpdatedAt: null
 };
 
 let _prevEth = 0;
+const CONTROL_SERVER_URL = window.METABOT_CONFIG?.controlServerUrl || '';
+
+function formatMintDisplay(price = COL.price) {
+  if (COL.mintPriceState === 'free') return 'FREE';
+  if (typeof price === 'number' && price > 0) {
+    return formatNativeUsd(price, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null });
+  }
+  return COL.mintPriceReason ? 'UNKNOWN · ' + COL.mintPriceReason : 'UNKNOWN';
+}
+
+function formatFloorDisplay(floor = COL.floor) {
+  return typeof floor === 'number' && floor > 0
+    ? formatNativeUsd(floor, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null })
+    : 'unknown';
+}
+
+async function syncControlBridge() {
+  if (!CONTROL_SERVER_URL) return;
+  try {
+    await fetch(CONTROL_SERVER_URL.replace(/\/$/, '') + '/bridge/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        walletReady: !!S.addr,
+        signerReady: !!S.signer,
+        address: S.addr || null,
+        ethPrice: S.ethPrice || null,
+        gasPrice: S.gasPrice || null,
+        activeCollection: COL.contract ? {
+          contract: COL.contract,
+          name: COL.name || '',
+          slug: COL.slug || '',
+          floor: COL.floor,
+          mintPrice: COL.price,
+          mintPriceState: COL.mintPriceState
+        } : null
+      })
+    });
+  } catch(e) {}
+}
 
 async function loadPrices() {
   try {
@@ -67,6 +111,7 @@ function _setEth(p) {
   }
   _prevEth = p;
   S.ethPrice = p;
+  syncControlBridge();
 }
 
 async function loadGas() {
@@ -88,11 +133,13 @@ async function loadGas() {
         const g = parseInt(d.result, 16) / 1e9;
         S.gasPrice = g;
         $('gasP').textContent = g >= 10 ? Math.round(g) : g.toFixed(1).replace(/\.0$/, '');
+        syncControlBridge();
         return;
       }
     } catch(e) {}
   }
   $('gasP').textContent = '--';
+  syncControlBridge();
 }
 
 function log(msg, t = '') {
@@ -132,6 +179,7 @@ window.connectWallet = async function({ forcePicker = false } = {}) {
     if ($('mAddr')) $('mAddr').value = S.addr;
     log('Connected: ' + S.addr, 'ok');
     setStatus('Wallet connected.', 'ok');
+    syncControlBridge();
   } catch(e) {
     log('Wallet error: ' + (e.message || e), 'err');
     setStatus(e.code === 4001 ? 'Wallet connection cancelled.' : 'Wallet connection failed.', 'err');
@@ -172,6 +220,7 @@ window.disconnectWallet = async function() {
   if ($('mAddr')) $('mAddr').value = '';
   setStatus('Wallet disconnected. Click Connect Wallet to choose an account.', 'ok');
   log('Wallet disconnected', 'info');
+  syncControlBridge();
 };
 
 if (window.ethereum) {
@@ -183,6 +232,7 @@ if (window.ethereum) {
       setWalletConnected(S.addr);
       if ($('mAddr')) $('mAddr').value = S.addr;
       log('Wallet switched: ' + S.addr, 'info');
+      syncControlBridge();
     } else {
       window.disconnectWallet();
     }
@@ -450,8 +500,13 @@ async function fetchCollection() {
     COL.contract = contract;
     if ($('bpContract')) $('bpContract').value = contract;
     COL.name = name;
-    COL.price = floor;
-    COL.floor = floor;
+    COL.price = null;
+    COL.floor = floor > 0 ? floor : null;
+    COL.floorSource = 'collection resolver';
+    COL.floorUpdatedAt = new Date().toISOString();
+    COL.mintPriceState = 'unknown';
+    COL.mintPriceSource = '';
+    COL.mintPriceReason = 'No verified mint phase or on-chain price getter found';
     COL.slug = parsed.value;
     COL.platform = parsed.type === 'slug' ? 'opensea' : parsed.platform;
 
@@ -481,25 +536,35 @@ async function fetchCollection() {
     if (phasePrice > 0) {
       // Drops API returned a real price
       COL.price = phasePrice;
+      COL.mintPriceState = 'known';
+      COL.mintPriceSource = 'drops API';
+      COL.mintPriceReason = '';
       if ($('mPrc') && !$('mPrc').value) $('mPrc').value = phasePrice.toFixed(4);
-      log('Mint price: ' + phasePrice.toFixed(4) + ' ETH (from drops API)', 'ok');
+      log('Mint price: ' + formatMintDisplay(phasePrice) + ' (from drops API)', 'ok');
     } else if (phasesResolved && phasePrice === 0) {
       // Drops API responded — price is 0 = confirmed FREE MINT
       COL.price = 0;
+      COL.mintPriceState = 'free';
+      COL.mintPriceSource = 'drops API';
+      COL.mintPriceReason = '';
       if ($('mPrc')) $('mPrc').value = '';
-  stopRefresh();
       log('Mint price: FREE (confirmed by drops API)', 'ok');
     } else if (detectedPrice && parseFloat(detectedPrice) > 0) {
       // On-chain getter found a price
       COL.price = parseFloat(detectedPrice);
+      COL.mintPriceState = 'known';
+      COL.mintPriceSource = 'on-chain getter';
+      COL.mintPriceReason = '';
       if ($('mPrc') && !$('mPrc').value) $('mPrc').value = parseFloat(detectedPrice).toFixed(4);
-      log('Mint price: ' + detectedPrice + ' ETH (on-chain detected)', 'ok');
+      log('Mint price: ' + formatMintDisplay(parseFloat(detectedPrice)) + ' (on-chain detected)', 'ok');
     } else {
-      // No price found anywhere — assume free, let user override
-      COL.price = 0;
+      // No verified price found — do not guess or mark FREE
+      COL.price = null;
+      COL.mintPriceState = 'unknown';
+      COL.mintPriceSource = 'resolver';
+      COL.mintPriceReason = 'Unverified';
       if ($('mPrc')) $('mPrc').value = '';
-  stopRefresh();
-      log('Mint price: FREE (no price getter — enter manually if paid)', 'ok');
+      log('Mint price: unknown (no verified phase or on-chain getter found)', 'warn');
     }
 
     // Render phases with full data
@@ -521,6 +586,7 @@ async function fetchCollection() {
       $('limitText').textContent = COL.supply.toLocaleString() + ' total supply · ' + remaining.toLocaleString() + ' remaining';
     }
     log('Loaded: ' + name + ' (' + contract.slice(0, 10) + '...) via ' + COL.platform, 'ok');
+    syncControlBridge();
   } catch(e) {
     setStatus('Error: ' + e.message, 'err');
     log(e.message, 'err');
@@ -624,12 +690,12 @@ function renderPhases(phases, supply, minted, detectedPrice) {
 
   if (!phases || phases.length === 0) {
     // Fallback single phase
-    renderPhase(detectedPrice || COL.price, supply, soldOut);
+    renderPhase(detectedPrice != null ? detectedPrice : COL.price, supply, soldOut);
     return;
   }
 
   const html = phases.map((ph, i) => {
-    const price = ph.price != null ? parseFloat(ph.price) : (detectedPrice ? parseFloat(detectedPrice) : 0);
+    const price = ph.price != null ? parseFloat(ph.price) : (detectedPrice ? parseFloat(detectedPrice) : null);
     const now = new Date();
     const start = ph.start_time ? new Date(ph.start_time) : null;
     const end   = ph.end_time   ? new Date(ph.end_time)   : null;
@@ -651,7 +717,7 @@ function renderPhases(phases, supply, minted, detectedPrice) {
         '<span class="phase-timer ' + timerClass + '">' + timerText + '</span>' +
       '</div>' +
       '<div class="phase-meta">' +
-        '<span class="phase-pill eth">PRICE · ' + (price > 0 ? price.toFixed(4) + ' Ξ' : 'FREE') + '</span>' +
+        '<span class="phase-pill eth">PRICE · ' + (price === 0 ? 'FREE' : (price > 0 ? formatNativeUsd(price, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : 'UNKNOWN')) + '</span>' +
         '<span class="phase-pill">SUPPLY · ' + (supply > 0 ? supply.toLocaleString() : '—') + '</span>' +
         (ph.max_per_wallet ? '<span class="phase-pill">MAX ' + ph.max_per_wallet + '/WALLET</span>' : '') +
       '</div>' +
@@ -683,15 +749,15 @@ window.selectPhase = function(el, price, startTime) {
 };
 
 function renderPhase(price, supply) {
-  const p = price > 0 ? parseFloat(price) : 0;
+  const p = typeof price === 'number' ? parseFloat(price) : null;
   $('phaseList').innerHTML =
     '<div class="phase selected">' +
       '<div class="phase-top">' +
-        '<span class="phase-name">' + (p === 0 ? 'FREE MINT' : 'PUBLIC MINT') + '</span>' +
+        '<span class="phase-name">' + (p === 0 ? 'FREE MINT' : (p > 0 ? 'PUBLIC MINT' : 'PRICE UNKNOWN')) + '</span>' +
         '<span class="phase-timer live">LIVE</span>' +
       '</div>' +
       '<div class="phase-meta">' +
-        '<span class="phase-pill eth">PRICE · ' + (p > 0 ? p.toFixed(4) + ' Ξ' : 'FREE') + '</span>' +
+        '<span class="phase-pill eth">PRICE · ' + (p === 0 ? 'FREE' : (p > 0 ? formatNativeUsd(p, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : 'UNKNOWN')) + '</span>' +
         '<span class="phase-pill">SUPPLY · ' + (supply > 0 ? supply.toLocaleString() : '—') + '</span>' +
       '</div>' +
     '</div>';
@@ -732,8 +798,8 @@ function renderColCard({ name, image, banner, contract, supply, minted, floor, t
   // Floor price display
   const floorEl = $('colFloor');
   if (floorEl) {
-    if (floor > 0) {
-      floorEl.textContent = 'Floor: ' + floor.toFixed(4) + ' Ξ';
+    if (typeof floor === 'number' && floor > 0) {
+      floorEl.textContent = 'Floor: ' + formatFloorDisplay(floor);
       floorEl.style.display = 'inline-flex';
     } else {
       floorEl.style.display = 'none';
@@ -865,7 +931,7 @@ function renderTasks() {
       '</div>' +
       '<div class="tc-meta">' +
         '<div class="tc-m"><span class="lk">Mode</span><span class="lv">' + t.mode.toUpperCase() + '</span></div>' +
-        '<div class="tc-m"><span class="lk">Price</span><span class="lv">' + (t.price > 0 ? t.price.toFixed(4) + ' ETH' : 'FREE') + '</span></div>' +
+        '<div class="tc-m"><span class="lk">Price</span><span class="lv">' + (t.price === 0 ? 'FREE' : (t.price > 0 ? formatNativeUsd(t.price, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : 'UNKNOWN')) + '</span></div>' +
         '<div class="tc-m"><span class="lk">Gas</span><span class="lv">' + t.options.maxGas + '</span></div>' +
         '<div class="tc-m"><span class="lk">' + (t.mode === 'scheduled' ? 'Fires In' : 'State') + '</span><span class="lv hi">' + (t.time ? fmtCD(t.time) : t.mode === 'sniper' ? 'WATCHING' : 'NOW') + '</span></div>' +
       '</div>' +
@@ -893,6 +959,7 @@ function renderTasks() {
       renderTasks();
     }
   }));
+  syncControlBridge();
 }
 
 function tickTasks() {
@@ -935,13 +1002,14 @@ function tickTasks() {
 
 function openModal(task) {
   S.pending = task;
-  const tot = task.price * task.qty;
+  const priceValue = task.price > 0 ? task.price : 0;
+  const tot = priceValue * task.qty;
   const vW = ethers.utils.parseEther(tot.toFixed(8)).toString();
 
   $('txPreview').innerHTML = [
     ['Collection', task.name || '-'],
     ['Contract', task.contract.slice(0, 14) + '...' + task.contract.slice(-4)],
-    ['Qty / Value', task.qty + ' x ' + (task.price > 0 ? task.price.toFixed(4) : '0') + ' ETH = ' + tot.toFixed(4) + ' ETH' + (S.ethPrice ? ' (~$' + (tot * S.ethPrice).toFixed(2) + ')' : '')],
+    ['Qty / Value', task.qty + ' x ' + (task.price === 0 ? 'FREE' : (task.price > 0 ? formatNativeUsd(task.price, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : 'UNKNOWN')) + (task.price > 0 ? ' = ' + formatNativeUsd(tot, { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : '')],
     ['Gas', task.options.maxGas + ' gwei max - ' + task.options.tip + ' gwei tip'],
   ].map(([k, v]) => '<div class="txr"><span class="txk">' + k + '</span><span class="txv">' + v + '</span></div>').join('');
 
@@ -1013,6 +1081,7 @@ window.connectPrivateKey = async function() {
     setWalletConnected(S.addr);
     if ($('mAddr')) $('mAddr').value = S.addr;
     log('PK wallet: ' + S.addr, 'ok');
+    syncControlBridge();
 
     // Hide PK section
     const pkSection = $('pkSection');
@@ -1278,9 +1347,9 @@ async function inspectContract() {
       '<div class="contract-inspector">' +
         '<div class="ci-row"><span class="ci-k">ABI</span><span class="ci-v">verified ✓ · ' + abi.length + ' entries</span></div>' +
         '<div class="ci-row"><span class="ci-k">Mint Fns</span><span class="ci-v">' + (fnList.length ? fnList.join(', ') : 'none detected') + '</span></div>' +
-        '<div class="ci-row"><span class="ci-k">Detected Price</span><span class="ci-v">' + (price ? price + ' ETH' : 'FREE / none') + '</span></div>' +
+        '<div class="ci-row"><span class="ci-k">Detected Price</span><span class="ci-v">' + (price ? formatNativeUsd(parseFloat(price), { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : 'UNKNOWN') + '</span></div>' +
       '</div>';
-    botLog('Inspector: ' + fns.length + ' mint fn(s), price ' + (price || 'free'), 'success');
+    botLog('Inspector: ' + fns.length + ' mint fn(s), price ' + (price ? formatNativeUsd(parseFloat(price), { symbol: COL.nativeSymbol || 'ETH', usdRate: S.ethPrice || null }) : 'unknown'), 'success');
   } catch(e) {
     if (box) box.innerHTML = '<div class="contract-inspector"><div class="ci-row"><span class="ci-k">Error</span><span class="ci-v" style="color:var(--err)">' + e.message + '</span></div></div>';
     botLog('Inspect failed: ' + e.message, 'error');
@@ -1359,7 +1428,10 @@ async function refreshStats() {
 
     // ── Update state ──
     COL.minted = minted;
-    if (floor > 0) COL.floor = floor;
+    if (floor > 0) {
+      COL.floor = floor;
+      COL.floorUpdatedAt = new Date().toISOString();
+    }
 
     // ── Update progress bar ──
     const supply = COL.supply;
@@ -1372,7 +1444,7 @@ async function refreshStats() {
     const floorEl = $('colFloor');
     if (floorEl) {
       if (floor > 0) {
-        floorEl.textContent = 'Floor: ' + floor.toFixed(4) + ' Ξ';
+        floorEl.textContent = 'Floor: ' + formatFloorDisplay(floor);
         floorEl.style.display = 'inline-flex';
       } else {
         floorEl.style.display = 'none';
@@ -1392,6 +1464,7 @@ async function refreshStats() {
       stopRefresh();
     }
 
+    syncControlBridge();
   } catch(e) {}
 }
 
@@ -1414,6 +1487,8 @@ async function init() {
   const t = new Date(Date.now() + 3600e3);
   if ($('mTime')) $('mTime').value = t.toISOString().slice(0, 16);
   await Promise.all([loadPrices(), loadGas()]);
+  syncControlBridge();
+  setInterval(syncControlBridge, 15000);
 }
 
 init();

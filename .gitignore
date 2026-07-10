@@ -5,3 +5,4 @@
 # (scripts/write-config.mjs can still regenerate it locally for custom RPC/gas).
 
 node_modules/
+.metabot-control-state.json
