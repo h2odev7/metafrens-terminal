@@ -3,5 +3,6 @@ window.METABOT_CONFIG = {
   "rpcUrl": "",
   "maxGasGwei": null,
   "tipGwei": null,
-  "turboMode": true
+  "turboMode": true,
+  "controlServerUrl": ""
 };

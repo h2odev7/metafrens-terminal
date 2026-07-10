@@ -37,7 +37,8 @@ const config = {
   rpcUrl:     process.env.DEFAULT_RPC_URL || '',
   maxGasGwei: numOrNull(process.env.DEFAULT_MAX_GAS_GWEI),
   tipGwei:    numOrNull(process.env.DEFAULT_TIP_GWEI),
-  turboMode:  truthy(process.env.TURBO_MODE_ENABLED)
+  turboMode:  truthy(process.env.TURBO_MODE_ENABLED),
+  controlServerUrl: process.env.DEFAULT_CONTROL_SERVER_URL || ''
 };
 
 const out =
