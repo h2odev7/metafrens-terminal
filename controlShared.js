@@ -229,8 +229,12 @@ export function matchesWatchReference(watch, reference) {
   return candidates.some(value => value === ref || value.includes(ref));
 }
 
+function cloneWatch(watch) {
+  return JSON.parse(JSON.stringify(watch));
+}
+
 export function applyWatchSnapshot(watch, snapshot = {}, now = new Date().toISOString()) {
-  const next = structuredClone(watch);
+  const next = cloneWatch(watch);
   next.updatedAt = now;
   next.lastCheckAt = now;
   next.lastError = snapshot.error || '';

@@ -189,6 +189,7 @@ async function fetchText(url, options = {}, timeoutMs = 9000) {
 async function fetchPageMirror(url) {
   const targets = [
     url,
+    // r.jina.ai is a plain-text mirror fallback for sites that block or heavily script direct fetches.
     `https://r.jina.ai/http://${cleanUrlToken(url).replace(/^https?:\/\//i, '')}`
   ];
   let lastError = null;
@@ -809,9 +810,9 @@ async function handleTelegramText(state, config, message) {
   }
 }
 
-async function pollTelegram(state, config) {
+async function pollTelegram(state, config, shouldRun = () => true) {
   if (!config.telegramToken) return;
-  while (true) {
+  while (shouldRun()) {
     state.telegram.lastPollAt = new Date().toISOString();
     try {
       const data = await telegramApi(config, 'getUpdates', {
@@ -839,6 +840,7 @@ async function pollTelegram(state, config) {
 export async function startControlServer(runtimeConfig = buildRuntimeConfig()) {
   const config = runtimeConfig;
   const state = loadStateFromFile(config.statePath);
+  let running = true;
   await getUsdQuote('ethereum', state, config);
   saveStateToFile(config.statePath, state);
 
@@ -883,7 +885,7 @@ export async function startControlServer(runtimeConfig = buildRuntimeConfig()) {
     if (!config.telegramToken) log(config, 'Telegram polling disabled (set TELEGRAM_BOT_TOKEN to enable)');
   });
 
-  setInterval(async () => {
+  const watchTimer = setInterval(async () => {
     try {
       await getUsdQuote('ethereum', state, config);
       const alerts = await refreshAllWatches(state, config);
@@ -896,8 +898,19 @@ export async function startControlServer(runtimeConfig = buildRuntimeConfig()) {
     }
   }, config.pollMs);
 
-  void pollTelegram(state, config);
-  return { server, state, config };
+  const shutdown = () => {
+    if (!running) return;
+    running = false;
+    clearInterval(watchTimer);
+    saveStateToFile(config.statePath, state);
+    server.close();
+  };
+
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
+
+  void pollTelegram(state, config, () => running);
+  return { server, state, config, shutdown };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
