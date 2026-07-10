@@ -6,8 +6,10 @@
 
 'use strict';
 
-const OPENSEA_API_KEY = '5ba47a8af05f4082a613832c2dc30bcc';
-const OPENSEA_HEADERS = { 'Accept': 'application/json', 'x-api-key': OPENSEA_API_KEY };
+const OPENSEA_HEADERS = { 'Accept': 'application/json' };
+if (window.METABOT_CONFIG?.openseaApiKey) {
+  OPENSEA_HEADERS['x-api-key'] = window.METABOT_CONFIG.openseaApiKey;
+}
 
 import {
   executeMint, detectPrice, createPrivateKeySigner, getPrivateKeyAddress,
