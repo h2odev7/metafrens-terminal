@@ -12,12 +12,76 @@ const OPENSEA_HEADERS = { 'Accept': 'application/json', 'x-api-key': OPENSEA_API
 import {
   executeMint, detectPrice, createPrivateKeySigner, getPrivateKeyAddress,
   fetchABI, findMintFunctions
-} from './mintEngine.js?v=20260605';
+} from './mintEngine.js?v=20260729m';
 // NOTE: mintEngine.js does not export batchMint(); per the "treat as import / do not
 // modify" constraint, the batch loop below is orchestrated in app.js on top of the
 // real executeMint() export (one signed tx per call).
 
 const $ = id => document.getElementById(id);
+
+/** True on phones/tablets — used for mobile wallet deep-links & dock UX. */
+function isMobileDevice() {
+  return /Android|iPhone|iPad|iPod|Mobile|IEMobile|Opera Mini/i.test(navigator.userAgent || '')
+    || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 900);
+}
+
+/** Absolute page URL without hash — used for wallet in-app browser deep links. */
+function currentDappUrl() {
+  return location.href.split('#')[0];
+}
+
+function buildMobileWalletLinks() {
+  const dapp = currentDappUrl();
+  const hostPath = dapp.replace(/^https?:\/\//, '');
+  return {
+    metamask: 'https://metamask.app.link/dapp/' + hostPath,
+    rainbow: 'https://rnbwapp.com/dapp?url=' + encodeURIComponent(dapp),
+    // Trust Wallet dApp browser
+    trust: 'https://link.trustwallet.com/open_url?coin_id=60&url=' + encodeURIComponent(dapp)
+  };
+}
+
+function openMobileWalletSheet() {
+  const sheet = $('mobileWalletSheet');
+  if (!sheet) return;
+  const links = buildMobileWalletLinks();
+  if ($('openInMetaMask')) $('openInMetaMask').href = links.metamask;
+  if ($('openInRainbow')) $('openInRainbow').href = links.rainbow;
+  if ($('openInTrust')) $('openInTrust').href = links.trust;
+  sheet.classList.add('open');
+  sheet.setAttribute('aria-hidden', 'false');
+}
+
+function closeMobileWalletSheet() {
+  const sheet = $('mobileWalletSheet');
+  if (!sheet) return;
+  sheet.classList.remove('open');
+  sheet.setAttribute('aria-hidden', 'true');
+}
+
+function wireMobileChrome() {
+  // Sticky dock mirrors desktop mint/queue actions
+  const mintBtn = $('mintBtn');
+  const queueBtn = $('queueBtn');
+  $('mobileMintBtn')?.addEventListener('click', () => mintBtn?.click());
+  $('mobileQueueBtn')?.addEventListener('click', () => queueBtn?.click());
+
+  $('closeWalletSheet')?.addEventListener('click', closeMobileWalletSheet);
+  $('mobileWalletSheet')?.addEventListener('click', e => {
+    if (e.target.id === 'mobileWalletSheet') closeMobileWalletSheet();
+  });
+  $('usePkMobileBtn')?.addEventListener('click', () => {
+    closeMobileWalletSheet();
+    if (typeof window.togglePKSection === 'function') window.togglePKSection();
+    $('pkInput')?.focus();
+  });
+
+  // If already inside a wallet browser, auto-prompt connect once
+  if (window.ethereum && isMobileDevice() && !S.addr) {
+    // Soft hint only — don't auto-pop permission on load
+    setStatus('Mobile wallet detected — tap Connect Wallet to mint on the go.', 'ok');
+  }
+}
 
 const S = {
   provider: null, signer: null, addr: null,
@@ -111,7 +175,17 @@ function setStatus(msg, t = '') {
 }
 
 window.connectWallet = async function({ forcePicker = false } = {}) {
-  if (!window.ethereum) { alert('Install MetaMask'); return; }
+  if (!window.ethereum) {
+    // On mobile Safari/Chrome there is no injected provider — guide user into a wallet browser.
+    if (isMobileDevice()) {
+      openMobileWalletSheet();
+      setStatus('Open METABOT inside MetaMask, Rainbow, or Trust to connect on mobile.', 'err');
+      log('No injected wallet — showing mobile connect options', 'warn');
+      return;
+    }
+    alert('Install MetaMask (or open this page in a mobile wallet browser).');
+    return;
+  }
   try {
     if (forcePicker && window.ethereum.request) {
       try {
@@ -130,8 +204,9 @@ window.connectWallet = async function({ forcePicker = false } = {}) {
     S.addr = await S.signer.getAddress();
     setWalletConnected(S.addr);
     if ($('mAddr')) $('mAddr').value = S.addr;
+    closeMobileWalletSheet();
     log('Connected: ' + S.addr, 'ok');
-    setStatus('Wallet connected.', 'ok');
+    setStatus('Wallet connected' + (isMobileDevice() ? ' (mobile)' : '') + '.', 'ok');
   } catch(e) {
     log('Wallet error: ' + (e.message || e), 'err');
     setStatus(e.code === 4001 ? 'Wallet connection cancelled.' : 'Wallet connection failed.', 'err');
@@ -749,8 +824,10 @@ document.querySelectorAll('#modeBar .mode-tab').forEach(b => b.addEventListener(
   b.classList.add('on');
   S.mode = b.dataset.mode;
   const notes = {
-    manual: 'Opens wallet immediately - you sign to mint',
-    scheduled: 'Fires at the scheduled time',
+    manual: isMobileDevice()
+      ? 'Opens your mobile wallet (or deep-link) so you can mint on the go'
+      : 'Opens wallet immediately - you sign to mint',
+    scheduled: 'Fires at the scheduled time (keep the tab open on your phone)',
     sniper: 'Polls contract every 10s - fires the instant mint goes live'
   };
   $('modeNote').textContent = notes[S.mode];
@@ -792,21 +869,35 @@ $('mintBtn').addEventListener('click', async () => {
 
   const task = buildTask(addr);
   if (S.mode === 'manual') {
-    if (await ensureSignerMatches(addr)) {
-      setStatus('Opening MetaMask for signature...');
-      try {
-        const result = await executeMint(task.contract, S.signer, task.qty, msg => log(msg, 'info'), task.options);
-        if (result.success) {
-          const link = '<a href="https://etherscan.io/tx/' + result.hash + '" target="_blank" rel="noopener">' + result.hash.slice(0,14) + '…</a>';
-          setStatus('Mint confirmed ✅', 'ok');
-          log('TX confirmed: ' + link + ' · Block ' + result.block, 'ok');
+    // Prefer in-page signer (MetaMask / wallet browser / hot key).
+    // On mobile without a provider, fall back to deep-link modal so minting works on the go.
+    if (S.signer || window.ethereum) {
+      if (await ensureSignerMatches(addr)) {
+        setStatus('Opening wallet for signature...');
+        try {
+          const result = await executeMint(task.contract, S.signer, task.qty, msg => log(msg, 'info'), task.options);
+          if (result.success) {
+            const link = '<a href="https://etherscan.io/tx/' + result.hash + '" target="_blank" rel="noopener">' + result.hash.slice(0,14) + '…</a>';
+            setStatus('Mint confirmed ✅', 'ok');
+            log('TX confirmed: ' + link + ' · Block ' + result.block, 'ok');
+          }
+        } catch(e) {
+          setStatus('Error: ' + e.message, 'err');
+          log(e.message, 'err');
         }
-      } catch(e) {
-        setStatus('Error: ' + e.message, 'err');
-        log(e.message, 'err');
+      } else if (isMobileDevice() && !window.ethereum) {
+        openModal(task);
+        setStatus('Use a mobile wallet deep-link to sign.', 'ok');
+      } else {
+        setStatus('Connect a wallet to sign this mint.', 'err');
+        if (isMobileDevice()) openMobileWalletSheet();
       }
     } else {
-      setStatus('Connect MetaMask to sign this mint.', 'err');
+      openModal(task);
+      setStatus(isMobileDevice()
+        ? 'Mobile mint ready — open MetaMask / Rainbow / Trust to sign.'
+        : 'Connect a wallet or use a deep-link to sign.', 'ok');
+      log('Manual mint via wallet deep-link (no injected provider)', 'info');
     }
   } else if (S.mode === 'scheduled') {
     task.status = 'waiting';
@@ -937,6 +1028,9 @@ function openModal(task) {
   S.pending = task;
   const tot = task.price * task.qty;
   const vW = ethers.utils.parseEther(tot.toFixed(8)).toString();
+  // Minimal mint(uint256) selector + qty — wallets that support eth send-with-data can prefill.
+  const mintData = '0x' + 'a0712d68' + BigInt(task.qty || 1).toString(16).padStart(64, '0');
+  const dappLinks = buildMobileWalletLinks();
 
   $('txPreview').innerHTML = [
     ['Collection', task.name || '-'],
@@ -946,11 +1040,25 @@ function openModal(task) {
   ].map(([k, v]) => '<div class="txr"><span class="txk">' + k + '</span><span class="txv">' + v + '</span></div>').join('');
 
   $('modalDesc').textContent = S.signer
-    ? 'MetaMask connected - sign on-chain directly.'
-    : 'Connect MetaMask or use a wallet deep-link below.';
-  $('btnMM').style.display = S.signer ? 'block' : 'none';
-  $('btnRainbow').href = 'https://rnbwapp.com/wc?uri=' + encodeURIComponent('ethereum:' + task.contract + '@1?value=' + vW);
-  $('btnTrust').href = 'trust://send?address=' + task.contract + '&amount=' + tot + '&coin=60';
+    ? 'Wallet connected — sign on-chain directly.'
+    : (isMobileDevice()
+      ? 'On mobile: open METABOT in your wallet browser, or jump via a deep-link below.'
+      : 'Connect MetaMask or use a wallet deep-link below.');
+  if ($('btnMM')) $('btnMM').style.display = S.signer ? 'block' : 'none';
+
+  // MetaMask mobile: open dapp browser on this page (best path), plus send deep-link fallback
+  if ($('btnMetaMaskApp')) {
+    $('btnMetaMaskApp').href = dappLinks.metamask;
+    $('btnMetaMaskApp').style.display = S.signer ? 'none' : 'flex';
+  }
+  if ($('btnRainbow')) {
+    $('btnRainbow').href = 'https://rnbwapp.com/wc?uri=' + encodeURIComponent(
+      'ethereum:' + task.contract + '@1?value=' + vW + '&data=' + mintData
+    );
+  }
+  if ($('btnTrust')) {
+    $('btnTrust').href = 'trust://send?address=' + task.contract + '&amount=' + tot + '&coin=60&token_id=&data=' + mintData;
+  }
   $('overlay').classList.add('open');
 }
 
@@ -1396,6 +1504,10 @@ async function refreshStats() {
 }
 
 async function init() {
+  wireMobileChrome();
+  if (isMobileDevice()) {
+    log('Mobile mint mode ready — connect via wallet browser or deep-link', 'info');
+  }
   // Restore persisted tasks
   try {
     const saved = JSON.parse(localStorage.getItem('mb_tasks') || '[]');
