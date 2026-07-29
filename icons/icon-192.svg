@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="METABOT">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#7c2fd4"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="40" fill="#0a0a0a"/>
+  <rect x="16" y="16" width="160" height="160" rx="32" fill="url(#g)"/>
+  <path d="M96 46 L70 110 H92 L84 146 L122 82 H100 Z" fill="#fff"/>
+</svg>
