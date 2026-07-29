@@ -405,6 +405,44 @@ body{
   .tc-meta{grid-template-columns:1fr 1fr;}
 }
 
+/* ── GROK BAR ── */
+.grok-bar{display:flex;gap:8px;margin-bottom:12px;}
+.grok-in{
+  flex:1;background:var(--card);border:1px solid var(--b1);color:var(--t0);
+  padding:10px 14px;font-family:var(--fi);font-size:12px;
+  border-radius:var(--r);outline:none;min-height:40px;
+}
+.grok-in:focus{border-color:var(--acc);}
+.grok-in::placeholder{color:var(--t2);}
+.grok-btn{
+  padding:10px 14px;background:transparent;
+  border:1px solid var(--b1);color:var(--t1);
+  border-radius:var(--r);font-family:var(--fi);font-size:11px;font-weight:700;
+  cursor:pointer;white-space:nowrap;min-height:40px;
+  letter-spacing:.04em;
+}
+.grok-btn:hover{border-color:var(--acc);color:var(--acc);}
+
+/* ── PK SECTION RESPONSIVE ── */
+.pk-content{
+  max-width:600px;margin:0 auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+}
+.pk-warn{
+  font-size:9px;color:var(--t2);max-width:160px;line-height:1.4;
+}
+
+/* ── TOPBAR RESPONSIVE ── */
+.tb-prices{display:flex;gap:14px;align-items:center;}
+.tb-btns{display:flex;align-items:center;gap:8px;}
+
+/* ── LIVE GAS INPUT (bot panel) ── */
+.bot-live-gas{
+  background:transparent;border:1px solid var(--b0);color:var(--acc2);
+  padding:2px 8px;font-family:var(--fi);font-size:9px;font-weight:600;
+  border-radius:20px;outline:none;max-width:90px;text-align:center;cursor:default;
+}
+.bot-live-gas::placeholder{color:var(--t2);}
+
 /* ── FLOOR PILL ── */
 .col-stats-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .floor-pill{
@@ -723,3 +761,95 @@ textarea.wallet-list::placeholder{color:var(--t2);}
 .result-stat.ok .rs-v{color:var(--ok);}
 .result-stat.err .rs-v{color:var(--err);}
 .result-list{margin-top:12px;display:flex;flex-direction:column;gap:6px;}
+
+/* ══════════════════════════════════════
+   MOBILE-FIRST RESPONSIVE LAYER
+   Ensures full usability on phones
+══════════════════════════════════════ */
+
+/* Prevent horizontal overflow on all viewports */
+html,body{overflow-x:hidden;}
+
+/* Topbar adapts gracefully for small screens */
+@media(max-width:600px){
+  .topbar{padding:0 12px;height:auto;min-height:48px;flex-wrap:wrap;gap:4px;padding-top:6px;padding-bottom:6px;}
+  .tb-r{flex-wrap:wrap;gap:6px;justify-content:flex-end;}
+  .tb-prices{gap:8px;}
+  .tb-stat{text-align:right;}
+  /* Compact prices on small screens */
+  .tb-l{font-size:8px;}
+  .tb-v{font-size:11px;}
+  /* Compact wallet buttons on small screens */
+  .wb{padding:6px 10px;font-size:10px;max-width:120px;}
+  .wb-pk{padding-inline:8px;font-size:12px;}
+}
+
+/* Hide ETH/GWEI price stats below 400px to save space for wallet buttons */
+@media(max-width:400px){
+  .tb-prices{display:none;}
+}
+
+/* PK section: stack vertically on small screens */
+@media(max-width:500px){
+  .pk-content{flex-direction:column;align-items:stretch;}
+  .pk-warn{max-width:100%;}
+  #pkSection{padding:10px 14px;}
+}
+
+/* Page padding for safe-area (iPhone notch / home bar) */
+@supports(padding-bottom: env(safe-area-inset-bottom)){
+  .page{
+    padding-left:max(14px, env(safe-area-inset-left));
+    padding-right:max(14px, env(safe-area-inset-right));
+    padding-bottom:calc(60px + env(safe-area-inset-bottom));
+  }
+  .theme-toggle{
+    bottom:calc(24px + env(safe-area-inset-bottom));
+    right:max(24px, env(safe-area-inset-right));
+  }
+}
+
+/* Touch-friendly targets: coarse pointer = touch device */
+@media(pointer:coarse){
+  /* All interactive controls meet 44px minimum touch target */
+  .wb,.url-btn,.mint-btn,.queue-btn,.bot-btn,.mode-tab,.tc-btn,.grok-btn{
+    min-height:44px;
+  }
+  .wb-pk{min-height:44px;min-width:44px;}
+  .mcls{width:36px;height:36px;}
+  .mc-field input,.bot-field input,textarea.wallet-list,.url-in,.grok-in,.inspect-input{
+    min-height:44px;
+  }
+  .sched-row input{min-height:44px;}
+  /* Increase phase tap area */
+  .phase{padding:14px;}
+  /* Increase log size on touch for readability */
+  .log{height:100px;}
+  .mint-log{max-height:240px;}
+}
+
+/* Modal: on small phones, anchor to bottom edge */
+@media(max-width:480px){
+  .ov{align-items:flex-end;}
+  .modal{
+    width:100%;max-width:100%;
+    border-radius:14px 14px 0 0;
+    padding:20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+    max-height:90dvh;overflow-y:auto;
+  }
+  /* Larger tap targets inside modal */
+  .btn-mm,.btn-dl{min-height:50px;font-size:14px;}
+  .mcls{top:16px;right:16px;width:36px;height:36px;}
+}
+
+/* Bot panel: single column on narrow viewports */
+@media(max-width:640px){
+  .bot-grid{grid-template-columns:1fr;}
+  .inspect-row{flex-wrap:nowrap;}
+}
+
+/* Ensure Grok bar is usable on all widths */
+@media(max-width:380px){
+  .grok-bar{flex-direction:column;}
+  .grok-btn{text-align:center;}
+}

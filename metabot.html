@@ -37,28 +37,32 @@
     <span class="wm">METABOT</span>
   </div>
   <div class="tb-r">
-    <div class="tb-stat"><span class="tb-l">ETH</span><span class="tb-v" id="ethP">$—</span></div>
-    <div class="tb-stat"><span class="tb-l">GWEI</span><span class="tb-v" id="gasP">—</span></div>
-    <button class="wb" id="walletBtn" onclick="connectWallet()">Connect Wallet</button>
-    <button class="wb wb-disconnect" id="disconnectBtn" onclick="disconnectWallet()" hidden>Disconnect</button>
-    <button class="wb wb-pk" onclick="togglePKSection()" title="Use private key wallet">🔑</button>
+    <div class="tb-prices">
+      <div class="tb-stat"><span class="tb-l">ETH</span><span class="tb-v" id="ethP">$—</span></div>
+      <div class="tb-stat"><span class="tb-l">GWEI</span><span class="tb-v" id="gasP">—</span></div>
+    </div>
+    <div class="tb-btns">
+      <button class="wb" id="walletBtn" onclick="connectWallet()">Connect Wallet</button>
+      <button class="wb wb-disconnect" id="disconnectBtn" onclick="disconnectWallet()" hidden>Disconnect</button>
+      <button class="wb wb-pk" onclick="togglePKSection()" title="Use private key wallet">🔑</button>
+    </div>
   </div>
 </div>
 
 <!-- PRIVATE KEY SECTION -->
 <div id="pkSection" style="display:none;background:var(--card);border-bottom:1px solid var(--b0);padding:10px 24px;">
-  <div style="max-width:600px;margin:0 auto;display:flex;gap:8px;align-items:center;">
-    <div style="flex:1;">
+  <div class="pk-content">
+    <div style="flex:1;min-width:0;">
       <input type="password" id="pkInput" placeholder="Private key (0x…) — cleared immediately after loading"
         style="width:100%;background:var(--card2);border:1px solid rgba(220,38,38,.3);color:var(--t0);
         padding:8px 12px;font-family:var(--fm,monospace);font-size:12px;border-radius:6px;outline:none;"/>
     </div>
     <button onclick="connectPrivateKey()"
       style="padding:8px 16px;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.3);
-      color:#ef4444;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">
+      color:#ef4444;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;min-height:44px;">
       Load Key
     </button>
-    <div style="font-size:9px;color:var(--t2);max-width:160px;line-height:1.4;">
+    <div class="pk-warn">
       ⚠️ Use a dedicated hot wallet only. Never use your main wallet's key.
     </div>
   </div>
@@ -75,6 +79,11 @@
   <p class="url-hint">
     <span class="primary">opensea.io collection URL</span> · <span>0x contract</span> · <span>zora.co</span> · <span>mint.fun</span>
   </p>
+  <!-- GROK SEARCH — AI-assisted collection research, available on all screen sizes -->
+  <div class="grok-bar">
+    <input type="text" id="grokIn" class="grok-in" placeholder="Ask Grok about this collection or mint…" autocomplete="off" enterkeyhint="search"/>
+    <button class="grok-btn" onclick="askGrok()">✦ Ask Grok</button>
+  </div>
   <div class="status-msg" id="statusMsg"></div>
 
   <!-- TWO COLUMN GRID -->
@@ -140,28 +149,28 @@
         <div class="mc-row">
           <div class="mc-field" style="grid-column:1/-1;">
             <label>Wallet Address</label>
-            <input type="text" id="mAddr" placeholder="0x… (auto-filled on connect)"/>
+            <input type="text" id="mAddr" placeholder="0x… (auto-filled on connect)" inputmode="text" autocomplete="off" autocapitalize="off"/>
           </div>
         </div>
         <div class="mc-row">
           <div class="mc-field">
             <label>Mint Price (ETH)</label>
-            <input type="number" id="mPrc" placeholder="auto-detected" step="0.0001" min="0"
+            <input type="number" id="mPrc" placeholder="auto-detected" step="0.0001" min="0" inputmode="decimal"
               oninput="COL.price = parseFloat(this.value) || 0"/>
           </div>
           <div class="mc-field">
             <label>Quantity</label>
-            <input type="number" id="mQty" value="1" min="1"/>
+            <input type="number" id="mQty" value="1" min="1" inputmode="numeric"/>
           </div>
         </div>
         <div class="mc-row">
           <div class="mc-field">
             <label>Max Gas (gwei)</label>
-            <input type="number" id="mGas" value="50"/>
+            <input type="number" id="mGas" value="50" inputmode="numeric"/>
           </div>
           <div class="mc-field">
             <label>Priority Tip (gwei)</label>
-            <input type="number" id="mTip" value="2" step="0.1"/>
+            <input type="number" id="mTip" value="2" step="0.1" inputmode="decimal"/>
           </div>
         </div>
         <div>
@@ -196,14 +205,12 @@
        All new bot UI lives inside #botPanel. IDs/classes below form the
        contract shared with app.js (logic) and style.css (styling).
 
-       Multi-wallet   : #walletsSection #walletList #walletCount #loadWalletsBtn
-       Batch mint      : #batchSection #batchQty #batchDelay #batchMintBtn #batchStopBtn
-       Gas controls    : #gasSection #gasMax #gasTip #turboToggle
-       Mint log        : #mintLogSection #mintLog
-       Result summary  : #resultSummary (hidden) #resultSuccess #resultFailed #resultTotal #resultList
-       Contract inspect: #contractInspector #inspectAddr #inspectBtn #inspectResult
-                         #inspectName #inspectSymbol #inspectSupply #inspectMaxSupply
-                         #inspectPrice #inspectMintFn
+       Multi-wallet   : #walletsSection #bpWallets #bpWalletCount #bpWalletList #bpParseBtn #bpBalBtn
+       Batch mint      : #batchSection #bpTotal #bpPerTx #bpDelay #bpRunBtn #bpStopBtn
+       Gas controls    : #gasSection #bpMaxGas #bpTip #bpLiveGas #bpTurbo #bpTurboChk
+       Mint log        : #mintLogSection #bpLog #bpClearLog
+       Result summary  : #bpSummary (rendered by renderSummary())
+       Contract inspect: #contractInspector #bpContract #bpInspectBtn #bpInspector
   ════════════════════════════════════════════════════════════════ -->
   <div class="bot-panel" id="botPanel">
     <div class="bot-panel-title">Bot Console</div>
@@ -213,12 +220,16 @@
       <section class="bot-section" id="walletsSection">
         <div class="bot-section-head">
           <span class="bot-section-title">Wallets</span>
-          <span class="bot-pill" id="walletCount">0 wallets</span>
+          <span class="bot-pill" id="bpWalletCount">0 wallets</span>
         </div>
-        <textarea id="walletList" class="wallet-list"
-          placeholder="One wallet per line — private key (0x…) or address (0x…)"
+        <textarea id="bpWallets" class="wallet-list"
+          placeholder="One private key (0x…) per line"
           spellcheck="false" autocomplete="off"></textarea>
-        <button class="bot-btn" id="loadWalletsBtn">Load Wallets</button>
+        <div id="bpWalletList"></div>
+        <div class="bot-btn-row">
+          <button class="bot-btn" id="bpParseBtn">Load Wallets</button>
+          <button class="bot-btn" id="bpBalBtn">Check Balances</button>
+        </div>
       </section>
 
       <!-- BATCH MINT CONTROLS -->
@@ -228,17 +239,23 @@
         </div>
         <div class="bot-row">
           <div class="bot-field">
-            <label for="batchQty">Qty / Wallet</label>
-            <input type="number" id="batchQty" value="1" min="1"/>
+            <label for="bpTotal">Qty / Wallet</label>
+            <input type="number" id="bpTotal" value="1" min="1"/>
           </div>
           <div class="bot-field">
-            <label for="batchDelay">Delay (ms)</label>
-            <input type="number" id="batchDelay" value="0" min="0" step="100"/>
+            <label for="bpPerTx">Qty / Tx</label>
+            <input type="number" id="bpPerTx" value="1" min="1"/>
+          </div>
+        </div>
+        <div class="bot-row">
+          <div class="bot-field">
+            <label for="bpDelay">Delay (ms)</label>
+            <input type="number" id="bpDelay" value="0" min="0" step="100"/>
           </div>
         </div>
         <div class="bot-btn-row">
-          <button class="bot-btn primary" id="batchMintBtn">⚡ Mint All Wallets</button>
-          <button class="bot-btn danger" id="batchStopBtn" disabled>Stop</button>
+          <button class="bot-btn primary" id="bpRunBtn">⚡ Mint All Wallets</button>
+          <button class="bot-btn danger" id="bpStopBtn" disabled>Stop</button>
         </div>
       </section>
 
@@ -246,19 +263,20 @@
       <section class="bot-section" id="gasSection">
         <div class="bot-section-head">
           <span class="bot-section-title">Gas Controls</span>
+          <input type="text" id="bpLiveGas" class="bot-live-gas" readonly placeholder="Live gas…" aria-label="Live gas price"/>
         </div>
         <div class="bot-row">
           <div class="bot-field">
-            <label for="gasMax">Max Gas (gwei)</label>
-            <input type="number" id="gasMax" placeholder="auto" min="0"/>
+            <label for="bpMaxGas">Max Gas (gwei)</label>
+            <input type="number" id="bpMaxGas" placeholder="auto" min="0"/>
           </div>
           <div class="bot-field">
-            <label for="gasTip">Priority Tip (gwei)</label>
-            <input type="number" id="gasTip" placeholder="auto" min="0" step="0.1"/>
+            <label for="bpTip">Priority Tip (gwei)</label>
+            <input type="number" id="bpTip" placeholder="auto" min="0" step="0.1"/>
           </div>
         </div>
-        <label class="turbo-toggle" for="turboToggle">
-          <input type="checkbox" id="turboToggle"/>
+        <label class="turbo-toggle" id="bpTurbo" for="bpTurboChk" role="switch" aria-checked="false">
+          <input type="checkbox" id="bpTurboChk"/>
           <span class="turbo-track"><span class="turbo-thumb"></span></span>
           <span class="turbo-text">Turbo Mode <span class="turbo-hint">— aggressive gas, parallel sends</span></span>
         </label>
@@ -270,18 +288,11 @@
           <span class="bot-section-title">Contract Inspector</span>
         </div>
         <div class="bot-row inspect-row">
-          <input type="text" id="inspectAddr" class="inspect-input"
+          <input type="text" id="bpContract" class="inspect-input"
             placeholder="0x contract address…" spellcheck="false" autocomplete="off"/>
-          <button class="bot-btn" id="inspectBtn">Inspect</button>
+          <button class="bot-btn" id="bpInspectBtn">Inspect</button>
         </div>
-        <div class="inspect-grid" id="inspectResult" hidden>
-          <div class="inspect-item"><span class="ik">Name</span><span class="iv" id="inspectName">—</span></div>
-          <div class="inspect-item"><span class="ik">Symbol</span><span class="iv" id="inspectSymbol">—</span></div>
-          <div class="inspect-item"><span class="ik">Total Supply</span><span class="iv" id="inspectSupply">—</span></div>
-          <div class="inspect-item"><span class="ik">Max Supply</span><span class="iv" id="inspectMaxSupply">—</span></div>
-          <div class="inspect-item"><span class="ik">Mint Price</span><span class="iv" id="inspectPrice">—</span></div>
-          <div class="inspect-item"><span class="ik">Mint Fn</span><span class="iv" id="inspectMintFn">—</span></div>
-        </div>
+        <div id="bpInspector"></div>
       </section>
 
     </div><!-- /bot-grid -->
@@ -290,22 +301,13 @@
     <section class="bot-section bot-section-wide" id="mintLogSection">
       <div class="bot-section-head">
         <span class="bot-section-title">Mint Log</span>
+        <button class="bot-btn" id="bpClearLog" style="width:auto;padding:4px 10px;font-size:9px;">Clear</button>
       </div>
-      <div class="mint-log" id="mintLog"></div>
+      <div class="mint-log" id="bpLog"></div>
     </section>
 
-    <!-- RESULT SUMMARY (hidden by default) -->
-    <div class="result-card" id="resultSummary" hidden>
-      <div class="bot-section-head">
-        <span class="bot-section-title">Mint Results</span>
-      </div>
-      <div class="result-stats">
-        <div class="result-stat ok"><span class="rs-v" id="resultSuccess">0</span><span class="rs-l">Success</span></div>
-        <div class="result-stat err"><span class="rs-v" id="resultFailed">0</span><span class="rs-l">Failed</span></div>
-        <div class="result-stat"><span class="rs-v" id="resultTotal">0</span><span class="rs-l">Total</span></div>
-      </div>
-      <div class="result-list" id="resultList"></div>
-    </div>
+    <!-- RESULT SUMMARY (rendered by renderSummary()) -->
+    <div id="bpSummary"></div>
 
   </div><!-- /botPanel -->
 

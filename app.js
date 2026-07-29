@@ -990,6 +990,19 @@ window.toggleTheme = function() {
   }
 })();
 
+/* ── GROK SEARCH — opens Grok with collection context pre-filled ── */
+window.askGrok = function() {
+  const q = ($('grokIn')?.value || '').trim();
+  const ctx = COL.name ? COL.name + ' NFT ' : '';
+  const query = ctx + q;
+  if (!query.trim()) { $('grokIn')?.focus(); return; }
+  window.open('https://x.com/i/grok?text=' + encodeURIComponent(query), '_blank', 'noopener,noreferrer');
+};
+
+if ($('grokIn')) {
+  $('grokIn').addEventListener('keydown', e => { if (e.key === 'Enter') window.askGrok(); });
+}
+
 
 /* ══════════════════════════════════════
    PRIVATE KEY MODE
